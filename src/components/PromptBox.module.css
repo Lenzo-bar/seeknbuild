@@ -1,0 +1,109 @@
+.wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-card);
+}
+
+/* Mode pills */
+.modes { display: flex; gap: 5px; }
+.pill {
+  font-size: 12px; padding: 5px 13px; border-radius: 20px;
+  border: 1px solid var(--border-mid); background: var(--surface-2);
+  color: var(--text-2); transition: all 0.14s;
+}
+.pill:hover { border-color: var(--navy); color: var(--navy); }
+.pillOn { background: var(--navy); border-color: var(--navy); color: #fff; }
+
+/* Textarea */
+.inputRow {}
+.textarea {
+  width: 100%; border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 10px 12px;
+  font-size: 13px; color: var(--text-1); background: var(--surface-2);
+  resize: none; outline: none; line-height: 1.55;
+  transition: border-color 0.14s;
+}
+.textarea:focus { border-color: var(--teal); background: var(--surface); }
+.textarea::placeholder { color: var(--text-3); }
+
+/* File drop zone */
+.dropZone {
+  border: 1.5px dashed var(--border-mid); border-radius: var(--r-md);
+  padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+  cursor: pointer; color: var(--text-2); font-size: 12px;
+  background: var(--surface-2); transition: border-color 0.14s, background 0.14s;
+}
+.dropZone:hover { border-color: var(--teal); background: var(--teal-light); }
+.dropZone small { color: var(--text-3); font-size: 10.5px; }
+.dropIcon { font-size: 18px; }
+.dropName { font-weight: 500; color: var(--teal); }
+
+/* Tool strip */
+.toolStrip { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.tool {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; padding: 4px 10px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-2); transition: all 0.13s;
+}
+.tool span { font-size: 13px; }
+.tool:hover { border-color: var(--teal); color: var(--teal); }
+.toolOn { background: var(--teal-light); border-color: var(--teal); color: var(--teal); }
+.hint { font-size: 10px; color: var(--text-3); margin-left: auto; }
+
+/* Button row */
+.btnRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+/* Base button */
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 500;
+  padding: 6px 14px; border-radius: var(--r-sm);
+  transition: all 0.13s; white-space: nowrap;
+}
+
+/* Enabled variants */
+.btnPrimary { background: var(--navy); color: #fff; border: none; }
+.btnPrimary:hover { opacity: 0.88; }
+
+.btnTeal { background: var(--teal); color: #fff; border: none; }
+.btnTeal:hover { opacity: 0.88; }
+
+.btnOutline { background: transparent; color: var(--text-2); border: 1px solid var(--border-mid); }
+.btnOutline:hover { border-color: var(--navy); color: var(--navy); background: var(--surface-2); }
+
+.btnDanger { background: transparent; color: var(--red); border: 1px solid rgba(220,38,38,0.3); }
+.btnDanger:hover { background: var(--red-light); }
+
+/* Disabled state — always clearly readable but visually muted */
+.btnDisabled {
+  background: var(--btn-disabled-bg);
+  color: var(--btn-disabled-text);
+  border: 1px solid var(--btn-disabled-border);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+/* Spinner for Analyzing state */
+.spinner {
+  display: inline-block;
+  width: 11px; height: 11px;
+  border: 2px solid rgba(255,255,255,0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
