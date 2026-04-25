@@ -7,6 +7,7 @@ interface Props {
   hasWeb:     boolean
   hasFile:    boolean
   isAnalyzing: boolean
+  isSearching: boolean
   onSearch:       (query: string) => void
   onAnalyze:      (file: File) => void   // now passes the real File
   onMoreQuestion: () => void
@@ -16,7 +17,7 @@ interface Props {
 }
 
 export function PromptBox({
-  hasAny, hasWeb, hasFile, isAnalyzing,
+  hasAny, hasWeb, hasFile, isAnalyzing, isSearching,
   onSearch, onAnalyze, onMoreQuestion,
   onClearWeb, onClearFile, onReset,
 }: Props) {
@@ -30,7 +31,7 @@ export function PromptBox({
   const fileRef = useRef<HTMLInputElement>(null)
 
   const isFile = mode === 'file'
-  const canSearch  = !isFile && query.trim().length > 0
+  const canSearch  = !isFile && query.trim().length > 0 && !isSearching
   const canAnalyze = isFile && !!file && !isAnalyzing
   const canMoreQ   = hasAny
   const canClearW  = hasWeb
@@ -113,7 +114,9 @@ export function PromptBox({
       <div className={styles.btnRow}>
         <button className={`${styles.btn} ${canSearch ? styles.btnPrimary : styles.btnDisabled}`}
           disabled={!canSearch} onClick={() => onSearch(query)} title="Search">
-          <SearchIcon /> Search
+          {isSearching
+            ? <><span className={styles.spinner} /> Searching…</>
+            : <><SearchIcon /> Search</>}
         </button>
 
         <button className={`${styles.btn} ${canAnalyze ? styles.btnTeal : styles.btnDisabled}`}

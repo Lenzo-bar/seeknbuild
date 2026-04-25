@@ -17,7 +17,7 @@ export default function App() {
   const {
     webCards, fileCards, moreCards, linkResults, allSelected,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
-    isAnalyzing,
+    isAnalyzing, isSearching, isLive,
     search, analyze, addMoreQuestion,
     refine, clearWeb, clearFile, reset,
     dismissCard, toggleDocSelect, clearDocSelections, reorderCards,
@@ -67,6 +67,12 @@ export default function App() {
             </button>
           ))}
         </div>
+        {isLive && (
+          <span style={{ marginLeft: 8, fontSize: 10, padding: '2px 8px', borderRadius: 9,
+            background: '#d1fae5', color: '#065f46', fontWeight: 600, letterSpacing: '0.05em' }}>
+            ● LIVE
+          </span>
+        )}
       </header>
 
       <main className={styles.main}>
@@ -76,8 +82,8 @@ export default function App() {
             hasAny={hasAny}
             hasWeb={hasWeb || hasLinks}
             hasFile={hasFile}
-            isAnalyzing={isAnalyzing}
-            onSearch={() => { search(); setExpandedId(null); setShowDoc(false); setShowMoreQ(false) }}
+            isAnalyzing={isAnalyzing} isSearching={isSearching}
+            onSearch={q => { search(q); setExpandedId(null); setShowDoc(false); setShowMoreQ(false) }}
             onAnalyze={f => { analyze(f); setExpandedId(null) }}
             onMoreQuestion={() => setShowMoreQ(v => !v)}
             onClearWeb={clearWeb}
@@ -87,7 +93,7 @@ export default function App() {
 
           {showMoreQ && (
             <MoreQuestionPanel
-              onSubmit={_q => { addMoreQuestion(); setShowMoreQ(false) }}
+              onSubmit={q => { addMoreQuestion(q); setShowMoreQ(false) }}
               onCancel={() => setShowMoreQ(false)}
             />
           )}
