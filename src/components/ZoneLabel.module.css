@@ -1,0 +1,24 @@
+.wrap {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 12px; border-radius: 20px;
+  font-size: 10.5px; font-weight: 500;
+  width: fit-content; margin-bottom: 8px;
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.label { text-transform: uppercase; letter-spacing: 0.05em; }
+.count { opacity: 0.7; font-weight: 400; }
+
+.web  { background: #E8F4F8; color: #085041; }
+.web  .dot { background: var(--navy); }
+.file { background: #E1F5EE; color: #085041; }
+.file .dot { background: var(--teal); }
+.more { background: #FFF8E8; color: #633806; }
+.more .dot { background: var(--gold); }
+
+.sep {
+  border-top: 1.5px dashed var(--border-mid);
+  margin: 16px 0 14px;
+  display: flex; align-items: center; gap: 10px;
+  padding-top: 14px;
+}
+.sep span { font-size: 10px; color: var(--text-3); white-space: nowrap; }
