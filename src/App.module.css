@@ -4,7 +4,6 @@
 .header {
   position: sticky; top: 0; z-index: 100;
   background: var(--surface);
-  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   padding: 0 24px;
   height: 52px;
@@ -47,17 +46,21 @@
   flex: 1;
   display: flex;
   align-items: flex-start;
-  gap: 0;
-  padding: 20px 20px 64px;
+  width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  width: 100%;
+  padding: 20px 20px 64px;
+  gap: 0;
+  box-sizing: border-box;
 }
 
 .sidebarCol {
-  width: 248px;
+  width: 256px;
+  min-width: 256px;
   flex-shrink: 0;
-  padding-right: 16px;
+  padding-right: 18px;
+  position: sticky;
+  top: 68px;
 }
 
 .main {

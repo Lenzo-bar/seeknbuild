@@ -19,7 +19,7 @@ export default function App() {
   const {
     webCards, fileCards, moreCards, linkResults, allSelected, sidebarFilters,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
-    isAnalyzing, isSearching, isLive,
+    isAnalyzing, isSearching, isLive, apiError,
     search, analyze, addMoreQuestion,
     refine, clearWeb, clearFile, reset,
     dismissCard, toggleDocSelect, clearDocSelections, reorderCards,
@@ -133,6 +133,12 @@ export default function App() {
               subMode={subMode}
               onChange={handleModeChange}
             />
+
+            {apiError && (
+              <div style={{ background: "var(--red-light)", border: "1px solid var(--red)", color: "var(--red)", borderRadius: "var(--r-md)", padding: "10px 14px", fontSize: 12, marginTop: 4 }}>
+                ⚠ API error: {apiError}
+              </div>
+            )}
 
             {showMoreQ && (
               <MoreQuestionPanel

@@ -1,37 +1,28 @@
 .sidebar {
-  width: 240px;
-  flex-shrink: 0;
+  width: 238px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 0;
-  align-self: flex-start;
-  position: sticky;
-  top: 68px;
-  max-height: calc(100vh - 100px);
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px 10px;
+  padding: 12px 14px 10px;
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  background: var(--surface);
-  z-index: 1;
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--surface-2);
 }
 
 .headerTitle {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   color: var(--text-3);
 }
 
@@ -44,19 +35,59 @@
   padding: 2px 0;
   font-weight: 500;
 }
-
 .resetBtn:hover { text-decoration: underline; }
 
+/* Body always rendered */
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Status: empty or loading */
+.statusArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px 32px;
+  color: var(--text-3);
+  font-size: 12px;
+  text-align: center;
+}
+
+.emptyIcon {
+  font-size: 22px;
+  opacity: 0.4;
+}
+
+.statusText {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--teal);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Filter sections */
 .sections {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0;
 }
 
 .section {
   border-bottom: 1px solid var(--border);
 }
-
 .section:last-child { border-bottom: none; }
 
 .sectionHeader {
@@ -64,13 +95,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 9px 14px;
   background: transparent;
   border: none;
   cursor: pointer;
   text-align: left;
+  transition: background 0.1s;
 }
-
 .sectionHeader:hover { background: var(--surface-2); }
 
 .sectionLabel {
@@ -79,20 +110,18 @@
   color: var(--text-1);
 }
 
-.sectionChevron {
+.chevron {
   transition: transform 0.15s;
   color: var(--text-3);
+  flex-shrink: 0;
 }
-
-.sectionChevronCollapsed {
-  transform: rotate(-90deg);
-}
+.chevronCollapsed { transform: rotate(-90deg); }
 
 .sectionBody {
-  padding: 2px 14px 10px;
+  padding: 2px 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .checkItem {
@@ -100,11 +129,10 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  padding: 3px 2px;
+  padding: 4px 2px;
   border-radius: var(--r-sm);
   transition: background 0.1s;
 }
-
 .checkItem:hover { background: var(--surface-2); }
 
 .checkbox {
@@ -141,7 +169,7 @@
 
 .rangeInput {
   flex: 1;
-  padding: 5px 8px;
+  padding: 5px 6px;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: var(--surface-2);
@@ -158,7 +186,7 @@
 }
 
 .applyBtn {
-  margin: 12px 14px 14px;
+  margin: 10px 12px 12px;
   padding: 9px 0;
   background: var(--navy);
   color: #fff;
@@ -170,35 +198,4 @@
   transition: opacity 0.14s;
   letter-spacing: 0.01em;
 }
-
-.applyBtn:hover { opacity: 0.88; }
-
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 32px 16px;
-  color: var(--text-3);
-  font-size: 12px;
-  text-align: center;
-  min-height: 120px;
-}
-
-.emptyHint {
-  font-style: italic;
-}
-
-.spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--border);
-  border-top-color: var(--teal);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+.applyBtn:hover { opacity: 0.87; }

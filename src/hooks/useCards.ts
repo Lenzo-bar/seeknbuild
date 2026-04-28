@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import type { SearchCard, LinkResult, FilterState, CardZone, SidebarFilterSection, SearchMode } from '../types'
-import { WEB_CARDS, MORE_CARDS, EXTRA_LINK_RESULTS } from '../data/integralCards'
+import { MORE_CARDS } from '../data/integralCards'
 import { parseFileToCards } from '../utils/fileParser'
 
 async function fetchLiveResults(
@@ -12,6 +12,7 @@ async function fetchLiveResults(
   links: LinkResult[]
   sidebarFilters: SidebarFilterSection[]
   topic: string
+  error?: string
 } | null> {
   try {
     const res = await fetch('/api/search', {
@@ -19,17 +20,21 @@ async function fetchLiveResults(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, searchMode, subMode }),
     })
-    if (!res.ok) return null
     const data = await res.json()
-    if (data.error) return null
 
-    const cards: SearchCard[] = (data.cards ?? []).map((r: SearchCard & { url?: string; type?: string }, i: number) => ({
+    // Surface API errors instead of silently swallowing them
+    if (data.error) {
+      console.error('[SeekNBuild] API error:', data.error, data.raw ?? '')
+      return { cards: [], links: [], sidebarFilters: [], topic: 'general', error: data.error }
+    }
+
+    const cards: SearchCard[] = (data.cards ?? []).map((r: SearchCard & { url?: string }, i: number) => ({
       id:            r.id ?? `web-${i}`,
       zone:          'web' as CardZone,
       type:          r.type ?? 'article',
       rank:          r.rank ?? i + 1,
       title:         r.title,
-      source:        r.url ?? r.source ?? '',
+      source:        r.url ?? (r as SearchCard).source ?? '',
       snippet:       r.snippet,
       tags:          Array.isArray(r.tags) ? r.tags : ['web'],
       hasVideo:      r.type === 'video',
@@ -51,18 +56,11 @@ async function fetchLiveResults(
       id: r.id, rank: r.rank, title: r.title, url: r.url, snippet: r.snippet,
     }))
 
-    const sidebarFilters: SidebarFilterSection[] = (data.sidebarFilters ?? []).map((s: SidebarFilterSection) => ({
-      id:      s.id,
-      label:   s.label,
-      type:    s.type,
-      options: s.options,
-      min:     s.min,
-      max:     s.max,
-      unit:    s.unit,
-    }))
+    const sidebarFilters: SidebarFilterSection[] = (data.sidebarFilters ?? [])
 
     return { cards, links, sidebarFilters, topic: data.topic ?? 'general' }
-  } catch {
+  } catch (e) {
+    console.error('[SeekNBuild] Fetch failed:', e)
     return null
   }
 }
@@ -102,6 +100,7 @@ export function useCards() {
   const [isSearching,    setIsSearching]    = useState(false)
   const [isAnalyzing,    setIsAnalyzing]    = useState(false)
   const [isLive,         setIsLive]         = useState(false)
+  const [apiError,       setApiError]       = useState<string | null>(null)
 
   const hasWeb   = webCards.length  > 0
   const hasFile  = fileCards.length > 0
@@ -111,6 +110,7 @@ export function useCards() {
 
   const search = useCallback(async (query: string, searchMode: SearchMode = 'all', subMode = '') => {
     setIsSearching(true)
+    setApiError(null)
     setWebCards([])
     setLinkResults([])
     setSidebarFilters([])
@@ -118,14 +118,18 @@ export function useCards() {
     const live = await fetchLiveResults(query, searchMode, subMode)
 
     if (live) {
-      setIsLive(true)
-      setWebCards(live.cards)
-      setLinkResults(live.links)
-      setSidebarFilters(live.sidebarFilters)
+      if (live.error) {
+        setApiError(live.error)
+        setIsLive(false)
+      } else {
+        setIsLive(true)
+        setWebCards(live.cards)
+        setLinkResults(live.links)
+        setSidebarFilters(live.sidebarFilters)
+      }
     } else {
+      setApiError('Could not reach the search API. Check your network or API key in Vercel.')
       setIsLive(false)
-      setWebCards(WEB_CARDS.map(c => ({ ...c, visible: true, docSelected: false })))
-      setLinkResults(EXTRA_LINK_RESULTS)
     }
 
     setIsSearching(false)
@@ -152,11 +156,10 @@ export function useCards() {
   const addMoreQuestion = useCallback(async (question: string) => {
     const live = await fetchLiveResults(question, 'all', '')
     const stamp = Date.now()
-    if (live && live.cards.length > 0) {
-      const moreFromLive = live.cards.map((c, i) => ({
+    if (live && !live.error && live.cards.length > 0) {
+      setMoreCards(prev => [...prev, ...live.cards.map((c, i) => ({
         ...c, id: `more-live-${stamp}-${i}`, zone: 'more' as CardZone,
-      }))
-      setMoreCards(prev => [...prev, ...moreFromLive])
+      }))])
     } else {
       setMoreCards(prev => [
         ...prev,
@@ -165,16 +168,16 @@ export function useCards() {
     }
   }, [])
 
-  const refine = useCallback((filters: FilterState) => {
+  const refine      = useCallback((filters: FilterState) => {
     setWebCards(prev => applyWebFilters(prev, filters))
   }, [])
 
-  const clearWeb  = useCallback(() => { setWebCards([]); setLinkResults([]) }, [])
-  const clearFile = useCallback(() => { setFileCards([]) }, [])
-  const clearMore = useCallback(() => { setMoreCards([]) }, [])
-  const reset     = useCallback(() => {
+  const clearWeb    = useCallback(() => { setWebCards([]); setLinkResults([]) }, [])
+  const clearFile   = useCallback(() => { setFileCards([]) }, [])
+  const clearMore   = useCallback(() => { setMoreCards([]) }, [])
+  const reset       = useCallback(() => {
     setWebCards([]); setFileCards([]); setMoreCards([])
-    setLinkResults([]); setSidebarFilters([])
+    setLinkResults([]); setSidebarFilters([]); setApiError(null)
   }, [])
 
   const dismissCard = useCallback((id: string, zone: CardZone) => {
@@ -210,7 +213,7 @@ export function useCards() {
       const remaining = prev.slice(count)
       if (!toConvert.length) return prev
       const newCards: SearchCard[] = toConvert.map((link, i) => ({
-        id: `link-card-${link.id}-${i}`, zone: 'web' as CardZone, type: 'article' as const,
+        id: `link-card-${link.id}-${i}`, zone: 'web' as CardZone, type: 'article',
         rank: 21 + i, title: link.title, source: link.url, snippet: link.snippet,
         tags: ['web'], hasVideo: false, visible: true, docSelected: false,
       }))
@@ -229,7 +232,7 @@ export function useCards() {
     webCards:  webCards.filter(c => c.visible),
     fileCards: fileCards.filter(c => c.visible),
     moreCards: moreCards.filter(c => c.visible),
-    linkResults, allSelected, sidebarFilters,
+    linkResults, allSelected, sidebarFilters, apiError,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
     isSearching, isAnalyzing, isLive,
     search, analyze, addMoreQuestion,
