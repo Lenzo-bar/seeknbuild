@@ -1,56 +1,72 @@
 import { useState, useCallback } from 'react'
-import type { SearchCard, LinkResult, FilterState, CardZone } from '../types'
+import type { SearchCard, LinkResult, FilterState, CardZone, SidebarFilterSection, SearchMode } from '../types'
 import { WEB_CARDS, MORE_CARDS, EXTRA_LINK_RESULTS } from '../data/integralCards'
 import { parseFileToCards } from '../utils/fileParser'
 
-// ── Live search via Vercel serverless function ───────────────────────
-async function fetchLiveResults(query: string): Promise<{
+async function fetchLiveResults(
+  query: string,
+  searchMode: SearchMode,
+  subMode: string
+): Promise<{
   cards: SearchCard[]
   links: LinkResult[]
+  sidebarFilters: SidebarFilterSection[]
+  topic: string
 } | null> {
   try {
     const res = await fetch('/api/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, searchMode, subMode }),
     })
     if (!res.ok) return null
     const data = await res.json()
     if (data.error) return null
 
-    const cards: SearchCard[] = (data.cards ?? []).map((r: {
-      id: string; rank: number; title: string; url: string; snippet: string; type?: string
-    }, i: number) => ({
-      id: r.id ?? `web-${i}`,
-      zone: 'web' as CardZone,
-      type: r.type === 'llm' ? 'article' : 'article',
-      rank: r.rank ?? i + 1,
-      title: r.title,
-      source: r.url,
-      snippet: r.snippet,
-      tags: r.type === 'llm' ? ['AI synthesis'] : ['web'],
-      hasVideo: false,
-      visible: true,
-      docSelected: false,
+    const cards: SearchCard[] = (data.cards ?? []).map((r: SearchCard & { url?: string; type?: string }, i: number) => ({
+      id:            r.id ?? `web-${i}`,
+      zone:          'web' as CardZone,
+      type:          r.type ?? 'article',
+      rank:          r.rank ?? i + 1,
+      title:         r.title,
+      source:        r.url ?? r.source ?? '',
+      snippet:       r.snippet,
+      tags:          Array.isArray(r.tags) ? r.tags : ['web'],
+      hasVideo:      r.type === 'video',
+      visible:       true,
+      docSelected:   false,
+      imageUrl:      r.imageUrl,
+      videoChannel:  r.videoChannel,
+      videoDuration: r.videoDuration,
+      publishedAt:   r.publishedAt,
+      outlet:        r.outlet,
+      price:         r.price,
+      rating:        r.rating,
+      upvotes:       r.upvotes,
+      replies:       r.replies,
+      forum:         r.forum,
     }))
 
-    const links: LinkResult[] = (data.links ?? []).map((r: {
-      id: string; rank: number; title: string; url: string; snippet: string
-    }) => ({
-      id: r.id,
-      rank: r.rank,
-      title: r.title,
-      url: r.url,
-      snippet: r.snippet,
+    const links: LinkResult[] = (data.links ?? []).map((r: LinkResult) => ({
+      id: r.id, rank: r.rank, title: r.title, url: r.url, snippet: r.snippet,
     }))
 
-    return { cards, links }
+    const sidebarFilters: SidebarFilterSection[] = (data.sidebarFilters ?? []).map((s: SidebarFilterSection) => ({
+      id:      s.id,
+      label:   s.label,
+      type:    s.type,
+      options: s.options,
+      min:     s.min,
+      max:     s.max,
+      unit:    s.unit,
+    }))
+
+    return { cards, links, sidebarFilters, topic: data.topic ?? 'general' }
   } catch {
     return null
   }
 }
 
-// ── Filter logic (for demo/math cards) ──────────────────────────────
 function applyWebFilters(cards: SearchCard[], filters: FilterState): SearchCard[] {
   const { learnerLevel, extraFilter } = filters
   return cards.map(card => {
@@ -77,15 +93,15 @@ function applyWebFilters(cards: SearchCard[], filters: FilterState): SearchCard[
   })
 }
 
-// ── Hook ─────────────────────────────────────────────────────────────
 export function useCards() {
-  const [webCards,    setWebCards]    = useState<SearchCard[]>([])
-  const [fileCards,   setFileCards]   = useState<SearchCard[]>([])
-  const [moreCards,   setMoreCards]   = useState<SearchCard[]>([])
-  const [linkResults, setLinkResults] = useState<LinkResult[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isLive,      setIsLive]      = useState(false)  // true when real API responded
+  const [webCards,       setWebCards]       = useState<SearchCard[]>([])
+  const [fileCards,      setFileCards]      = useState<SearchCard[]>([])
+  const [moreCards,      setMoreCards]      = useState<SearchCard[]>([])
+  const [linkResults,    setLinkResults]    = useState<LinkResult[]>([])
+  const [sidebarFilters, setSidebarFilters] = useState<SidebarFilterSection[]>([])
+  const [isSearching,    setIsSearching]    = useState(false)
+  const [isAnalyzing,    setIsAnalyzing]    = useState(false)
+  const [isLive,         setIsLive]         = useState(false)
 
   const hasWeb   = webCards.length  > 0
   const hasFile  = fileCards.length > 0
@@ -93,20 +109,20 @@ export function useCards() {
   const hasLinks = linkResults.length > 0
   const hasAny   = hasWeb || hasFile || hasMore
 
-  // Search: try live API first, fall back to demo data
-  const search = useCallback(async (query: string) => {
+  const search = useCallback(async (query: string, searchMode: SearchMode = 'all', subMode = '') => {
     setIsSearching(true)
     setWebCards([])
     setLinkResults([])
+    setSidebarFilters([])
 
-    const live = await fetchLiveResults(query)
+    const live = await fetchLiveResults(query, searchMode, subMode)
 
     if (live) {
       setIsLive(true)
       setWebCards(live.cards)
       setLinkResults(live.links)
+      setSidebarFilters(live.sidebarFilters)
     } else {
-      // API not configured or failed — use demo integral cards
       setIsLive(false)
       setWebCards(WEB_CARDS.map(c => ({ ...c, visible: true, docSelected: false })))
       setLinkResults(EXTRA_LINK_RESULTS)
@@ -115,7 +131,6 @@ export function useCards() {
     setIsSearching(false)
   }, [])
 
-  // File analysis — parses the actual File object
   const analyze = useCallback(async (file: File) => {
     setIsAnalyzing(true)
     setFileCards([])
@@ -124,11 +139,9 @@ export function useCards() {
       setFileCards(cards)
     } catch {
       setFileCards([{
-        id: 'file-error',
-        zone: 'file', type: 'file', rank: 1,
-        title: 'Could not parse file',
-        source: file.name,
-        snippet: 'Supported formats: .txt, .md, .csv, .docx, .pdf (text layer).',
+        id: 'file-error', zone: 'file', type: 'file', rank: 1,
+        title: 'Could not parse file', source: file.name,
+        snippet: 'Supported: .txt, .md, .csv, .docx, .pdf (text layer).',
         tags: ['error'], hasVideo: false, visible: true, docSelected: false,
       }])
     } finally {
@@ -137,14 +150,11 @@ export function useCards() {
   }, [])
 
   const addMoreQuestion = useCallback(async (question: string) => {
-    // Try live API for more question too
-    const live = await fetchLiveResults(question)
+    const live = await fetchLiveResults(question, 'all', '')
     const stamp = Date.now()
     if (live && live.cards.length > 0) {
       const moreFromLive = live.cards.map((c, i) => ({
-        ...c,
-        id: `more-live-${stamp}-${i}`,
-        zone: 'more' as CardZone,
+        ...c, id: `more-live-${stamp}-${i}`, zone: 'more' as CardZone,
       }))
       setMoreCards(prev => [...prev, ...moreFromLive])
     } else {
@@ -163,7 +173,8 @@ export function useCards() {
   const clearFile = useCallback(() => { setFileCards([]) }, [])
   const clearMore = useCallback(() => { setMoreCards([]) }, [])
   const reset     = useCallback(() => {
-    setWebCards([]); setFileCards([]); setMoreCards([]); setLinkResults([])
+    setWebCards([]); setFileCards([]); setMoreCards([])
+    setLinkResults([]); setSidebarFilters([])
   }, [])
 
   const dismissCard = useCallback((id: string, zone: CardZone) => {
@@ -197,19 +208,11 @@ export function useCards() {
     setLinkResults(prev => {
       const toConvert = prev.slice(0, count)
       const remaining = prev.slice(count)
-      if (toConvert.length === 0) return prev
+      if (!toConvert.length) return prev
       const newCards: SearchCard[] = toConvert.map((link, i) => ({
-        id: `link-card-${link.id}-${i}`,
-        zone: 'web' as CardZone,
-        type: 'article' as const,
-        rank: 21 + i,
-        title: link.title,
-        source: link.url,
-        snippet: link.snippet,
-        tags: ['web'],
-        hasVideo: false,
-        visible: true,
-        docSelected: false,
+        id: `link-card-${link.id}-${i}`, zone: 'web' as CardZone, type: 'article' as const,
+        rank: 21 + i, title: link.title, source: link.url, snippet: link.snippet,
+        tags: ['web'], hasVideo: false, visible: true, docSelected: false,
       }))
       setWebCards(prev2 => [...prev2, ...newCards])
       return remaining
@@ -226,8 +229,7 @@ export function useCards() {
     webCards:  webCards.filter(c => c.visible),
     fileCards: fileCards.filter(c => c.visible),
     moreCards: moreCards.filter(c => c.visible),
-    linkResults,
-    allSelected,
+    linkResults, allSelected, sidebarFilters,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
     isSearching, isAnalyzing, isLive,
     search, analyze, addMoreQuestion,

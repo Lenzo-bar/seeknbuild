@@ -1,15 +1,17 @@
 import { useState, useRef } from 'react'
-import type { AppMode } from '../types'
+import type { AppMode, SearchMode } from '../types'
 import styles from './PromptBox.module.css'
 
 interface Props {
-  hasAny:     boolean
-  hasWeb:     boolean
-  hasFile:    boolean
+  hasAny:      boolean
+  hasWeb:      boolean
+  hasFile:     boolean
   isAnalyzing: boolean
   isSearching: boolean
-  onSearch:       (query: string) => void
-  onAnalyze:      (file: File) => void   // now passes the real File
+  searchMode:  SearchMode
+  subMode:     string
+  onSearch:       (query: string, mode: SearchMode, sub: string) => void
+  onAnalyze:      (file: File) => void
   onMoreQuestion: () => void
   onClearWeb:     () => void
   onClearFile:    () => void
@@ -18,19 +20,18 @@ interface Props {
 
 export function PromptBox({
   hasAny, hasWeb, hasFile, isAnalyzing, isSearching,
+  searchMode, subMode,
   onSearch, onAnalyze, onMoreQuestion,
   onClearWeb, onClearFile, onReset,
 }: Props) {
-  const [query,    setQuery]    = useState(
-    'Create at least one example of each of the different types of definite integrals in Calculus?'
-  )
-  const [mode,     setMode]     = useState<AppMode>('web')
-  const [mathOn,   setMathOn]   = useState(true)
-  const [deepOn,   setDeepOn]   = useState(false)
-  const [file,     setFile]     = useState<File | null>(null)
+  const [query,  setQuery]  = useState('')
+  const [mode,   setMode]   = useState<AppMode>('web')
+  const [mathOn, setMathOn] = useState(true)
+  const [deepOn, setDeepOn] = useState(false)
+  const [file,   setFile]   = useState<File | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const isFile = mode === 'file'
+  const isFile     = mode === 'file'
   const canSearch  = !isFile && query.trim().length > 0 && !isSearching
   const canAnalyze = isFile && !!file && !isAnalyzing
   const canMoreQ   = hasAny
@@ -55,6 +56,10 @@ export function PromptBox({
     onReset()
   }
 
+  function handleSearch() {
+    if (canSearch) onSearch(query, searchMode, subMode)
+  }
+
   return (
     <div className={styles.wrap}>
       {/* Mode pills */}
@@ -75,8 +80,8 @@ export function PromptBox({
         className={styles.textarea}
         value={query}
         onChange={e => setQuery(e.target.value)}
-        onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') canSearch && onSearch(query) }}
-        placeholder="Ask anything — or switch to File analysis to upload a document…"
+        onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSearch() }}
+        placeholder="Ask anything, search any topic — results appear as interactive cards…"
         rows={3}
       />
 
@@ -113,39 +118,38 @@ export function PromptBox({
       {/* Action buttons */}
       <div className={styles.btnRow}>
         <button className={`${styles.btn} ${canSearch ? styles.btnPrimary : styles.btnDisabled}`}
-          disabled={!canSearch} onClick={() => onSearch(query)} title="Search">
+          disabled={!canSearch} onClick={handleSearch}>
           {isSearching
             ? <><span className={styles.spinner} /> Searching…</>
             : <><SearchIcon /> Search</>}
         </button>
 
         <button className={`${styles.btn} ${canAnalyze ? styles.btnTeal : styles.btnDisabled}`}
-          disabled={!canAnalyze} onClick={() => file && onAnalyze(file)}
-          title={isFile ? (file ? 'Analyze the uploaded file' : 'Select a file first') : 'Switch to File analysis mode'}>
+          disabled={!canAnalyze} onClick={() => file && onAnalyze(file)}>
           {isAnalyzing
             ? <><span className={styles.spinner} /> Analyzing…</>
             : <><DocIcon /> Analyze</>}
         </button>
 
         <button className={`${styles.btn} ${canMoreQ ? styles.btnOutline : styles.btnDisabled}`}
-          disabled={!canMoreQ} onClick={onMoreQuestion} title="Add a follow-up question">
+          disabled={!canMoreQ} onClick={onMoreQuestion}>
           <PlusIcon /> More question
         </button>
 
         <span style={{ flex: 1 }} />
 
         <button className={`${styles.btn} ${canClearW ? styles.btnOutline : styles.btnDisabled}`}
-          disabled={!canClearW} onClick={onClearWeb} title="Clear web result cards — keeps prompt">
+          disabled={!canClearW} onClick={onClearWeb}>
           <TrashIcon /> Clear web result
         </button>
 
         <button className={`${styles.btn} ${canClearF ? styles.btnOutline : styles.btnDisabled}`}
-          disabled={!canClearF} onClick={onClearFile} title="Clear file analysis cards">
+          disabled={!canClearF} onClick={onClearFile}>
           <FileXIcon /> Clear file info
         </button>
 
         <button className={`${styles.btn} ${canReset ? styles.btnDanger : styles.btnDisabled}`}
-          disabled={!canReset} onClick={handleReset} title="Reset everything">
+          disabled={!canReset} onClick={handleReset}>
           <ResetIcon /> Reset
         </button>
       </div>

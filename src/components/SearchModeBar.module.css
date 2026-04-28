@@ -1,0 +1,106 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  padding: 0 2px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.item {
+  position: relative;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.14s, background 0.14s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.tab:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.tabActive {
+  color: var(--navy);
+  background: transparent;
+  position: relative;
+}
+
+.tabActive::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 14px;
+  right: 14px;
+  height: 2px;
+  background: var(--navy);
+  border-radius: 1px 1px 0 0;
+}
+
+.subLabel {
+  font-weight: 400;
+  color: var(--teal);
+  font-size: 12px;
+}
+
+.chevron {
+  transition: transform 0.15s;
+  opacity: 0.6;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lift);
+  z-index: 200;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.dropItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.dropItem:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+.dropItemActive {
+  color: var(--navy);
+  font-weight: 500;
+  background: var(--teal-light);
+}

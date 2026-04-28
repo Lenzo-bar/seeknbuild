@@ -1,7 +1,17 @@
-export type CardType = 'math' | 'article' | 'video' | 'image' | 'file'
-export type CardZone = 'web' | 'file' | 'more'
-export type AppMode  = 'web' | 'llm' | 'file'
+export type CardType  = 'math' | 'article' | 'video' | 'image' | 'file' | 'news' | 'forum' | 'shopping'
+export type CardZone  = 'web' | 'file' | 'more'
+export type AppMode   = 'web' | 'llm' | 'file'
 export type ThemeName = 'light' | 'dark' | 'blue'
+
+export type SearchMode =
+  | 'all' | 'news' | 'images' | 'videos'
+  | 'forums' | 'shopping' | 'entertainment' | 'sports' | 'hobby'
+
+export interface SearchModeConfig {
+  id: SearchMode
+  label: string
+  subOptions?: { id: string; label: string }[]
+}
 
 export interface SearchCard {
   id: string
@@ -17,6 +27,18 @@ export interface SearchCard {
   hasVideo: boolean
   visible: boolean
   docSelected: boolean
+  imageUrl?: string
+  videoId?: string
+  videoThumb?: string
+  videoDuration?: string
+  videoChannel?: string
+  publishedAt?: string
+  outlet?: string
+  price?: string
+  rating?: number
+  upvotes?: number
+  replies?: number
+  forum?: string
 }
 
 export interface LinkResult {
@@ -33,11 +55,17 @@ export interface FilterState {
   extraFilter: string
 }
 
-export interface ButtonStates {
-  search:   boolean   // active when mode=web and not yet loading
-  analyze:  boolean   // active when mode=file AND file chosen
-  moreQ:    boolean   // active when hasAny
-  clearWeb: boolean   // active when hasWeb || hasLinks
-  clearFile:boolean   // active when hasFile
-  reset:    boolean   // active when hasAny || prompt has text
+export interface SidebarFilterSection {
+  id: string
+  label: string
+  type: 'checkboxes' | 'range' | 'select' | 'radio'
+  options?: string[]
+  min?: number
+  max?: number
+  unit?: string
+}
+
+export interface SidebarFilters {
+  sections: SidebarFilterSection[]
+  values: Record<string, unknown>
 }
