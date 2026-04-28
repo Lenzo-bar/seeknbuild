@@ -1,21 +1,24 @@
+/* The sidebar fills its sticky container */
 .sidebar {
-  width: 238px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
   display: flex;
   flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--r-lg);
   overflow: hidden;
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  min-height: 120px;
 }
 
+/* ── Header ── */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px 10px;
+  padding: 11px 14px 9px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
+  flex-shrink: 0;
 }
 
 .headerTitle {
@@ -32,62 +35,48 @@
   background: none;
   border: none;
   cursor: pointer;
-  padding: 2px 0;
+  padding: 0;
   font-weight: 500;
 }
 .resetBtn:hover { text-decoration: underline; }
 
-/* Body always rendered */
+/* ── Body ── */
 .body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 
-/* Status: empty or loading */
+/* ── Empty / loading state ── */
 .statusArea {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 28px 16px 32px;
+  padding: 28px 16px;
   color: var(--text-3);
-  font-size: 12px;
   text-align: center;
+  flex: 1;
 }
 
-.emptyIcon {
-  font-size: 22px;
-  opacity: 0.4;
-}
-
-.statusText {
-  font-size: 12px;
-  color: var(--text-3);
-  line-height: 1.5;
-}
+.emptyIcon   { font-size: 24px; opacity: 0.35; }
+.statusText  { font-size: 12px; color: var(--text-3); line-height: 1.5; }
 
 .spinner {
-  width: 20px;
-  height: 20px;
+  width: 22px; height: 22px;
   border: 2px solid var(--border);
   border-top-color: var(--teal);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
-
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Filter sections */
-.sections {
-  flex: 1;
-  overflow-y: auto;
-}
+/* ── Filter sections ── */
+.sections { flex: 1; }
 
-.section {
-  border-bottom: 1px solid var(--border);
-}
+.section { border-bottom: 1px solid var(--border); }
 .section:last-child { border-bottom: none; }
 
 .sectionHeader {
@@ -104,51 +93,34 @@
 }
 .sectionHeader:hover { background: var(--surface-2); }
 
-.sectionLabel {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-1);
-}
+.sectionLabel { font-size: 12px; font-weight: 600; color: var(--text-1); }
 
-.chevron {
-  transition: transform 0.15s;
-  color: var(--text-3);
-  flex-shrink: 0;
-}
+.chevron { transition: transform 0.15s; color: var(--text-3); }
 .chevronCollapsed { transform: rotate(-90deg); }
 
 .sectionBody {
-  padding: 2px 12px 10px;
+  padding: 4px 14px 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
+/* ── Checkbox / radio items ── */
 .checkItem {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
-  padding: 4px 2px;
+  padding: 4px 4px;
   border-radius: var(--r-sm);
+  cursor: pointer;
   transition: background 0.1s;
 }
 .checkItem:hover { background: var(--surface-2); }
 
-.checkbox {
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  accent-color: var(--navy);
-  cursor: pointer;
-}
+.checkbox { width:14px; height:14px; flex-shrink:0; accent-color:var(--navy); cursor:pointer; }
+.checkLabel { font-size: 12px; color: var(--text-2); line-height: 1.3; }
 
-.checkLabel {
-  font-size: 12px;
-  color: var(--text-2);
-  line-height: 1.3;
-}
-
+/* ── Select ── */
 .select {
   width: 100%;
   padding: 6px 8px;
@@ -161,14 +133,10 @@
   cursor: pointer;
 }
 
-.rangeRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
+/* ── Range ── */
+.rangeRow { display: flex; align-items: center; gap: 6px; }
 .rangeInput {
-  flex: 1;
+  flex: 1; min-width: 0;
   padding: 5px 6px;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -176,15 +144,10 @@
   color: var(--text-1);
   font-size: 12px;
   font-family: inherit;
-  min-width: 0;
 }
+.rangeSep { font-size: 12px; color: var(--text-3); flex-shrink: 0; }
 
-.rangeSep {
-  color: var(--text-3);
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
+/* ── Apply button ── */
 .applyBtn {
   margin: 10px 12px 12px;
   padding: 9px 0;
@@ -196,6 +159,6 @@
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.14s;
-  letter-spacing: 0.01em;
+  flex-shrink: 0;
 }
 .applyBtn:hover { opacity: 0.87; }
