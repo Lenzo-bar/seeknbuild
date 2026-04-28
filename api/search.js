@@ -1,68 +1,55 @@
 // api/search.js — SeekNBuild v4
 export const config = { runtime: 'edge' }
 
-const MODE_INSTRUCTIONS = {
-  all:           'Return a broad mix of web results: articles, resources, and reference pages.',
-  news:          'Return recent news articles. Include publishedAt and outlet per card.',
-  images:        'Return image-focused results. Include imageUrl per card if available.',
-  videos:        'Return video results. Include videoChannel and videoDuration per card.',
-  forums:        'Return forum/community results (Reddit, StackOverflow etc). Include forum, upvotes, replies per card.',
-  shopping:      'Return product/shopping results. Include price and rating per card.',
-  entertainment: 'Return entertainment results: movies, shows, music, games, events.',
-  sports:        'Return sports results: scores, stats, player news, schedules.',
-  hobby:         'Return hobby tutorials, communities, guides, tips.',
-}
-
 function buildPrompt(query, searchMode, subMode) {
-  const hint = subMode
-    ? `${MODE_INSTRUCTIONS[searchMode] || ''} Focus on sub-category: ${subMode}.`
-    : (MODE_INSTRUCTIONS[searchMode] || MODE_INSTRUCTIONS.all)
+  const modeHints = {
+    all:           'Return a broad mix of web results.',
+    news:          'Focus on recent news articles. Add "publishedAt" and "outlet" fields.',
+    images:        'Focus on image results. Add "imageUrl" field per card.',
+    videos:        'Focus on video results. Add "videoChannel" and "videoDuration" fields.',
+    forums:        'Focus on forum/community posts. Add "forum", "upvotes", "replies" fields.',
+    shopping:      'Focus on products/shopping. Add "price" and "rating" fields.',
+    entertainment: 'Focus on movies, shows, music, games.',
+    sports:        'Focus on sports scores, stats, news.',
+    hobby:         'Focus on tutorials, guides, communities.',
+  }
+  const hint = modeHints[searchMode] || modeHints.all
+  const sub = subMode ? ` Sub-category: ${subMode}.` : ''
 
-  const extra = {
-    news:     '"publishedAt": "2h ago", "outlet": "CBC News",',
-    images:   '"imageUrl": "https://example.com/img.jpg",',
-    videos:   '"videoChannel": "Channel Name", "videoDuration": "10:22",',
-    forums:   '"forum": "Reddit", "upvotes": 142, "replies": 38,',
-    shopping: '"price": "$349,000", "rating": 4.2,',
-  }[searchMode] || ''
+  const sidebarExamples = {
+    'real-estate': '[{"id":"price","label":"Price Range","type":"range","unit":"$"},{"id":"beds","label":"Bedrooms","type":"radio","options":["Any","1","2","3","4","5+"]},{"id":"type","label":"Property Type","type":"checkboxes","options":["House","Condo","Townhouse","Land"]},{"id":"listing","label":"Listing Type","type":"radio","options":["For Sale","For Rent"]}]',
+    'automotive':  '[{"id":"make","label":"Make","type":"checkboxes","options":["Toyota","Honda","Ford","Chevrolet","BMW"]},{"id":"year","label":"Year Range","type":"range","unit":""},{"id":"price","label":"Price","type":"range","unit":"$"},{"id":"condition","label":"Condition","type":"radio","options":["New","Used","Certified Pre-Owned"]}]',
+    'shopping':    '[{"id":"price","label":"Price Range","type":"range","unit":"$"},{"id":"rating","label":"Min Rating","type":"radio","options":["Any","3+ stars","4+ stars","4.5+ stars"]},{"id":"avail","label":"Availability","type":"radio","options":["Any","In Stock"]}]',
+    'sports':      '[{"id":"league","label":"League","type":"checkboxes","options":["NBA","NFL","NHL","MLB","MLS"]},{"id":"date","label":"Date","type":"select","options":["Today","This week","This month"]}]',
+    'news':        '[{"id":"date","label":"Date","type":"select","options":["Past hour","Today","This week","This month"]},{"id":"source","label":"Source Type","type":"checkboxes","options":["News","Blog","Official","Video"]}]',
+    'general':     '[{"id":"type","label":"Content Type","type":"checkboxes","options":["Article","Video","Forum","Official","Blog"]},{"id":"date","label":"Date","type":"select","options":["Any time","Past week","Past month","Past year"]}]',
+  }
 
-  return `Search the web for: "${query}"
-Mode: ${searchMode}${subMode ? ` > ${subMode}` : ''}
-${hint}
+  return `You are a web search assistant. Search for: "${query}"
+Mode: ${searchMode}.${sub} ${hint}
 
-Return ONLY a raw JSON object (absolutely no markdown, no backticks, no extra text):
+IMPORTANT: Respond with ONLY a valid JSON object. No explanation, no markdown, no code fences. Start your response with { and end with }.
+
 {
-  "synthesis": "2-3 sentence direct answer based on what you found.",
-  "topic": "pick one: general|math|science|tech|real-estate|automotive|health|finance|travel|cooking|sports|news|shopping|entertainment|hobby",
+  "synthesis": "2-3 sentence answer to the query",
+  "topic": "choose one: general|real-estate|automotive|shopping|sports|news|entertainment|hobby|tech|health|travel|finance",
   "cards": [
     {
-      "title": "Result title here",
-      "url": "https://real-url.com/page",
-      "snippet": "1-2 sentence description of this specific result.",
-      ${extra}
-      "tags": ["tag1", "tag2"]
+      "title": "Page or result title",
+      "url": "https://example.com",
+      "snippet": "Brief description of this result",
+      "tags": ["tag1","tag2"]
     }
   ],
-  "sidebarFilters": [
-    {
-      "id": "unique_snake_case_id",
-      "label": "Human Readable Label",
-      "type": "checkboxes",
-      "options": ["Option A", "Option B", "Option C"]
-    }
-  ]
+  "sidebarFilters": ${sidebarExamples[searchMode] || sidebarExamples.general}
 }
 
-CRITICAL RULES:
-- cards: up to 20 real results matching the query and mode. DO NOT return math/calculus content unless the query is about math.
-- sidebarFilters: 3-6 filters dynamically tailored to THIS query's domain:
-    real-estate → Price Range (range,unit:"$"), Bedrooms (radio,options:["1","2","3","4","5+"]), Property Type (checkboxes,options:["House","Condo","Townhouse","Land"]), Listing Type (radio,options:["For Sale","For Rent"])
-    automotive → Make (checkboxes), Year (range), Price (range,unit:"$"), Condition (radio,options:["New","Used","Certified"]), Transmission (radio,options:["Automatic","Manual"])
-    shopping → Price Range (range,unit:"$"), Rating (radio,options:["4+ stars","3+ stars","Any"]), Availability (radio,options:["In Stock","Any"])
-    sports → League (checkboxes), Date (select,options:["Today","This week","This month"])
-    news → Date (select,options:["Past hour","Today","This week"]), Source (checkboxes)
-    For "range" type include "unit" field. For "select" type include "options" array.
-- Return ONLY the raw JSON. No markdown. No explanation.`
+Rules:
+- cards: 8-15 real results relevant to "${query}". Match the search mode type.
+- sidebarFilters: generate filters relevant to the query topic. Use the topic field to guide this.
+  For real-estate queries, use real-estate filters. For car queries, use automotive filters. Etc.
+- Every string must use double quotes. No trailing commas.
+- Output ONLY the JSON. Nothing before the opening brace. Nothing after the closing brace.`
 }
 
 export default async function handler(req) {
@@ -71,30 +58,21 @@ export default async function handler(req) {
   }
 
   let body
-  try { body = await req.json() } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400, headers: { 'Content-Type': 'application/json' }
-    })
-  }
+  try { body = await req.json() }
+  catch { return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400, headers: { 'Content-Type': 'application/json' } }) }
 
   const { query, searchMode = 'all', subMode = '' } = body
-
   if (!query?.trim()) {
-    return new Response(JSON.stringify({ error: 'Missing query' }), {
-      status: 400, headers: { 'Content-Type': 'application/json' }
-    })
+    return new Response(JSON.stringify({ error: 'Missing query' }), { status: 400, headers: { 'Content-Type': 'application/json' } })
   }
 
-  // Try both env var names — ANTHROPIC_API_KEY (preferred) and VITE_ANTHROPIC_API_KEY (legacy)
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY
   if (!ANTHROPIC_KEY) {
-    return new Response(JSON.stringify({
-      error: 'API key missing. Set ANTHROPIC_API_KEY in Vercel Environment Variables.'
-    }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not set in Vercel Environment Variables' }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -104,42 +82,45 @@ export default async function handler(req) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 5000,
+        max_tokens: 4000,
         tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
         messages: [{ role: 'user', content: buildPrompt(query, searchMode, subMode) }]
       })
     })
 
-    const responseText = await response.text()
+    const raw = await anthropicRes.text()
 
-    if (!response.ok) {
-      return new Response(JSON.stringify({
-        error: `Anthropic ${response.status}: ${responseText.slice(0, 500)}`
-      }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    if (!anthropicRes.ok) {
+      return new Response(JSON.stringify({ error: `Anthropic ${anthropicRes.status}: ${raw.slice(0, 300)}` }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     }
 
-    let data
-    try { data = JSON.parse(responseText) } catch {
-      return new Response(JSON.stringify({ error: 'Failed to parse Anthropic response' }), {
-        status: 500, headers: { 'Content-Type': 'application/json' }
-      })
-    }
+    let anthropicData
+    try { anthropicData = JSON.parse(raw) }
+    catch { return new Response(JSON.stringify({ error: 'Could not parse Anthropic response', raw: raw.slice(0, 200) }), { status: 500, headers: { 'Content-Type': 'application/json' } }) }
 
-    const textBlock = data.content?.find(b => b.type === 'text')
+    // Find the text block — Claude may return tool_use + text blocks
+    const textBlock = anthropicData.content?.find(b => b.type === 'text')
     if (!textBlock?.text) {
-      return new Response(JSON.stringify({
-        error: 'No text in response', contentTypes: data.content?.map(b => b.type)
-      }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+      const types = anthropicData.content?.map(b => b.type).join(', ')
+      return new Response(JSON.stringify({ error: `No text block found. Block types: ${types}`, stop_reason: anthropicData.stop_reason }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     }
 
-    const clean = textBlock.text
-      .replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/```\s*$/im, '').trim()
+    // Clean and parse the JSON
+    let jsonText = textBlock.text.trim()
+    // Strip markdown fences if present
+    jsonText = jsonText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+    // Find the JSON object boundaries
+    const start = jsonText.indexOf('{')
+    const end   = jsonText.lastIndexOf('}')
+    if (start === -1 || end === -1) {
+      return new Response(JSON.stringify({ error: 'No JSON object found in response', preview: jsonText.slice(0, 200) }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    }
+    jsonText = jsonText.slice(start, end + 1)
 
     let parsed
-    try { parsed = JSON.parse(clean) } catch {
-      return new Response(JSON.stringify({
-        error: 'Response was not valid JSON', preview: clean.slice(0, 300)
-      }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    try { parsed = JSON.parse(jsonText) }
+    catch (e) {
+      return new Response(JSON.stringify({ error: `JSON parse failed: ${e.message}`, preview: jsonText.slice(0, 300) }), { status: 500, headers: { 'Content-Type': 'application/json' } })
     }
 
     const rawCards       = Array.isArray(parsed.cards)          ? parsed.cards          : []
@@ -149,16 +130,17 @@ export default async function handler(req) {
     const cards = []
     if (synthesis) {
       cards.push({
-        id: 'llm-synthesis', rank: 0, type: 'article',
-        title: `Summary: ${query.slice(0, 60)}${query.length > 60 ? '…' : ''}`,
+        id: 'synthesis-0', rank: 0, type: 'article',
+        title: `Summary: ${query.slice(0, 55)}${query.length > 55 ? '…' : ''}`,
         url: '', snippet: synthesis, tags: ['AI summary'],
       })
     }
 
     rawCards.slice(0, 20).forEach((r, i) => {
-      const type = { videos:'video', images:'image', news:'news', forums:'forum', shopping:'shopping' }[searchMode] || 'article'
+      const typeMap = { videos: 'video', images: 'image', news: 'news', forums: 'forum', shopping: 'shopping' }
       cards.push({
-        id: `web-${i}`, rank: i + 1, type,
+        id: `web-${i}`, rank: i + 1,
+        type: typeMap[searchMode] || 'article',
         title:         r.title         ?? 'Untitled',
         url:           r.url           ?? '',
         snippet:       r.snippet       ?? '',
@@ -169,7 +151,7 @@ export default async function handler(req) {
         publishedAt:   r.publishedAt,
         outlet:        r.outlet,
         price:         r.price,
-        rating:        r.rating,
+        rating:        typeof r.rating === 'number' ? r.rating : undefined,
         upvotes:       r.upvotes,
         replies:       r.replies,
         forum:         r.forum,
@@ -186,8 +168,6 @@ export default async function handler(req) {
     })
 
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { 'Content-Type': 'application/json' }
-    })
+    return new Response(JSON.stringify({ error: `Handler error: ${String(err)}` }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }
