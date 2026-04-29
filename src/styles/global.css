@@ -121,6 +121,49 @@
   --btn-disabled-border: #2d3f5a;
 }
 
+
+/* ── WARM THEME — slightly darker, richer, not-too-pale ──────────── */
+[data-theme="warm"] {
+  --navy:        #1B3A6B;
+  --navy-light:  #2a5298;
+  --teal:        #0D7A8A;
+  --teal-light:  #d4eef2;
+  --gold:        #B8922A;
+  --gold-light:  #FDF3DC;
+  --gold-border: #d4a843;
+
+  --bg:          #E8E9EC;
+  --surface:     #F2F3F5;
+  --surface-2:   #E4E5E9;
+  --border:      #C8CBD4;
+  --border-mid:  #A8ABB6;
+  --text-1:      #0E1520;
+  --text-2:      #3A4250;
+  --text-3:      #7A8394;
+
+  --red:         #C41F1F;
+  --red-light:   #FAE8E8;
+  --green:       #047857;
+  --green-light: #D8F5EC;
+
+  --badge-math-bg:    #E4E2FC;
+  --badge-math-text:  #2E2880;
+  --badge-art-bg:     #D4EEE4;
+  --badge-art-text:   #064535;
+  --badge-vid-bg:     #0E1520;
+  --badge-vid-text:   #93C5FD;
+
+  --link-bg:       #E4E8F4;
+  --link-border:   #A8B4CC;
+  --link-url:      #0D7A8A;
+
+  --btn-disabled-text:   #8A93A4;
+  --btn-disabled-bg:     #D8DAE0;
+  --btn-disabled-border: #C0C4CE;
+
+  --skel: #D0D2D8;
+}
+
 /* ── Shared tokens (theme-independent) ─────────────────────────────── */
 :root {
   --font-ui:   'DM Sans', system-ui, sans-serif;

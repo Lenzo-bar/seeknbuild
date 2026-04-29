@@ -14,6 +14,7 @@ import { LinkZone }           from './components/LinkZone'
 import { useCards }           from './hooks/useCards'
 import { getFilterCategory }  from './data/filterCategories'
 import type { CardZone, ThemeName, SearchMode, ActiveFilterChip, FilterCategory } from './types'
+import { useRef } from 'react'
 import styles from './App.module.css'
 
 // Detect category from query text + topic
@@ -61,11 +62,30 @@ export default function App() {
   const [searchMode,   setSearchMode]   = useState<SearchMode>('all')
   const [subMode,      setSubMode]      = useState('')
   const [activeChips,  setActiveChips]  = useState<ActiveFilterChip[]>([])
-  const [filterCat,    setFilterCat]    = useState<FilterCategory>('general')
+  const [filterCat,      setFilterCat]      = useState<FilterCategory>('general')
+  const [lockedTopic,    setLockedTopic]    = useState<string>('')        // topic from last search
+  const [lockedKeywords, setLockedKeywords] = useState<string[]>([])      // keywords from last query
+  const [showTopicDialog, setShowTopicDialog] = useState(false)           // 'still about X?' dialog
+  const [dialogTopic,    setDialogTopic]    = useState<string>('')        // topic label for dialog
+  const lastQueryRef = useRef<string>('')
   const [filterResetKey,  setFilterResetKey]  = useState(0)
   const [removedChipId,   setRemovedChipId]   = useState<string | null>(null)
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme])
+
+  // Extract significant keywords from a query string
+  function extractKeywords(q: string): string[] {
+    const stop = new Set(['for','sale','the','and','or','a','an','in','of','to','is','are','show','me','find','list','about','with','some','many'])
+    return q.toLowerCase().split(/\s+/).filter(w => w.length > 2 && !stop.has(w))
+  }
+
+  // Check if new query shares enough keywords with the locked topic
+  function queryStillOnTopic(newQuery: string): boolean {
+    if (!lockedKeywords.length) return false
+    const newKw = extractKeywords(newQuery)
+    const matches = lockedKeywords.filter(k => newKw.some(n => n.includes(k) || k.includes(n)))
+    return matches.length >= Math.ceil(lockedKeywords.length * 0.4) // 40% overlap = same topic
+  }
 
   function handleModeChange(mode: SearchMode, sub = '') {
     setSearchMode(mode); setSubMode(sub)
@@ -76,6 +96,10 @@ export default function App() {
     const cat = detectCategory(query, '')
     setFilterCat(cat)
     setActiveChips([])
+    // Lock topic keywords for persistence detection
+    lastQueryRef.current = query
+    setLockedTopic(query)
+    setLockedKeywords(extractKeywords(query))
     search(query, mode, subMode)
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
@@ -126,14 +150,52 @@ export default function App() {
         </div>
         <div className={styles.themeSwitcher}>
           <span className={styles.themeLabel}>Theme</span>
-          {(['light','dark','blue'] as ThemeName[]).map(t => (
+          {(['light','warm','dark','blue'] as ThemeName[]).map(t => (
             <button key={t} className={`${styles.themeBtn} ${theme===t ? styles.themeBtnOn:''}`}
               onClick={() => setTheme(t)} title={t}>
-              {t==='light'?'☀':t==='dark'?'🌙':'🔷'}
+              {t==='light'?'☀':t==='warm'?'🌤':t==='dark'?'🌙':'🔷'}
             </button>
           ))}
+          {/* Warm theme button */}
         </div>
       </header>
+
+      {/* ── Topic persistence dialog ── */}
+      {showTopicDialog && (
+        <div style={{
+          position:'fixed', top:0, left:0, right:0, bottom:0,
+          background:'rgba(0,0,0,0.35)', zIndex:1000,
+          display:'flex', alignItems:'center', justifyContent:'center'
+        }}>
+          <div style={{
+            background:'var(--surface)', border:'1px solid var(--border)',
+            borderRadius:'var(--r-lg)', padding:'24px 28px', maxWidth:380,
+            boxShadow:'var(--shadow-overlay)', display:'flex', flexDirection:'column', gap:16
+          }}>
+            <p style={{fontSize:14, color:'var(--text-1)', lineHeight:1.5}}>
+              Are you still searching about <strong style={{color:'var(--navy)'}}>"{dialogTopic}"</strong>?
+            </p>
+            <p style={{fontSize:12, color:'var(--text-3)'}}>Keep the current refinement filters, or reset them for a new topic.</p>
+            <div style={{display:'flex', gap:10, justifyContent:'flex-end'}}>
+              <button
+                onClick={() => { setShowTopicDialog(false) }}
+                style={{padding:'8px 18px', borderRadius:'var(--r-md)', border:'1px solid var(--border)', background:'var(--surface-2)', color:'var(--text-1)', fontSize:13, fontWeight:600, cursor:'pointer'}}
+              >Yes, keep filters</button>
+              <button
+                onClick={() => {
+                  setShowTopicDialog(false)
+                  setActiveChips([])
+                  setFilterResetKey(k => k + 1)
+                  setLockedTopic('')
+                  setLockedKeywords([])
+                  setFilterCat('general')
+                }}
+                style={{padding:'8px 18px', borderRadius:'var(--r-md)', border:'none', background:'var(--navy)', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer'}}
+              >No, reset filters</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Two-column layout ── */}
       <div className={styles.layout}>
@@ -161,6 +223,18 @@ export default function App() {
             hasSearched={hasSearched}
             searchMode={searchMode} subMode={subMode}
             onSearch={(q, _mode, _sub) => handleSearch(q)}
+            onPromptChange={(q) => {
+              // If prompt cleared and user starts re-typing — check topic
+              if (lockedTopic && q.length === 1 && lastQueryRef.current.length > 1) {
+                setDialogTopic(lockedTopic)
+                setShowTopicDialog(true)
+              } else if (lockedTopic && q.length > 3 && hasSearched) {
+                // Silently keep sidebar if still on topic, reset if clearly different
+                if (!queryStillOnTopic(q)) {
+                  // Don't immediately clear — only clear on actual new search
+                }
+              }
+            }}
             onAnalyze={f => { analyze(f); setExpandedId(null) }}
             onMoreQuestion={() => setShowMoreQ(v => !v)}
             onClearWeb={clearWeb} onClearFile={clearFile}

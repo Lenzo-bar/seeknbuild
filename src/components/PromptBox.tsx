@@ -12,6 +12,7 @@ interface Props {
   searchMode:  SearchMode
   subMode:     string
   onSearch:       (query: string, mode: SearchMode, sub: string) => void
+  onPromptChange?: (query: string) => void
   onAnalyze:      (file: File) => void
   onMoreQuestion: () => void
   onClearWeb:     () => void
@@ -20,7 +21,7 @@ interface Props {
 }
 
 export function PromptBox({
-  hasAny, hasWeb, hasFile, isAnalyzing, isSearching, hasSearched,
+  hasAny, hasWeb, hasFile, isAnalyzing, isSearching, hasSearched, onPromptChange,
   searchMode, subMode,
   onSearch, onAnalyze, onMoreQuestion,
   onClearWeb, onClearFile, onReset,
@@ -83,7 +84,7 @@ export function PromptBox({
       <textarea
         className={styles.textarea}
         value={query}
-        onChange={e => { setQuery(e.target.value); setQueryEdited(true) }}
+        onChange={e => { setQuery(e.target.value); setQueryEdited(true); onPromptChange?.(e.target.value) }}
         onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSearch() }}
         placeholder="Ask anything, search any topic — results appear as interactive cards…"
         rows={3}

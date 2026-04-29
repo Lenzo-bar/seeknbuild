@@ -1,7 +1,7 @@
 export type CardType  = 'math'|'article'|'video'|'image'|'file'|'news'|'forum'|'shopping'|'llm'
 export type CardZone  = 'web'|'file'|'more'
 export type AppMode   = 'web'|'llm'|'file'
-export type ThemeName = 'light'|'dark'|'blue'
+export type ThemeName = 'light'|'warm'|'dark'|'blue'
 export type FilterCategory = 'buying-selling'|'academia'|'general'
 
 export type SearchMode =
