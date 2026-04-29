@@ -13,6 +13,7 @@ interface Props {
   topic:       string
   sections:    SidebarFilterSection[]   // for buying-selling (from API)
   isSearching: boolean
+  resetKey:    number                   // increment to force-reset all filters
   onRefine:    (chips: ActiveFilterChip[]) => void
 }
 
@@ -257,8 +258,13 @@ function BuyingSellingPanel({ topic, sections, onChipsChange }: {
 }
 
 // ── Main export ───────────────────────────────────────────────────
-export function SidebarFilters({ category, topic, sections, isSearching, onRefine }: Props) {
+export function SidebarFilters({ category, topic, sections, isSearching, resetKey, onRefine }: Props) {
   const [chips, setChips] = useState<ActiveFilterChip[]>([])
+
+  // When resetKey changes (from parent Clear All), wipe local chips too
+  useEffect(() => {
+    setChips([])
+  }, [resetKey])
 
   function handleChips(incoming: ActiveFilterChip[]) {
     setChips(incoming)
@@ -275,16 +281,17 @@ export function SidebarFilters({ category, topic, sections, isSearching, onRefin
           {category === 'academia' ? '🎓 Academia' : category === 'buying-selling' ? '🛒 Buy / Sell' : '🔍 General'}
         </span>
         {hasAny && (
-          <button className={styles.resetBtn} onClick={() => handleChips([])}>Clear</button>
+          <button className={styles.resetBtn} onClick={() => { setChips([]); onRefine([]) }}>Clear</button>
         )}
       </div>
 
       {isSearching ? (
         category === 'academia' ? <SkeletonAcademia /> : <SkeletonBuying />
       ) : category === 'academia' ? (
-        <AcademiaPanel topic={topic} onChipsChange={handleChips} />
+        // key=resetKey forces full remount → resets all checkboxes/dropdowns
+        <AcademiaPanel key={`acad-${resetKey}`} topic={topic} onChipsChange={handleChips} />
       ) : (
-        <BuyingSellingPanel topic={topic} sections={sections} onChipsChange={handleChips} />
+        <BuyingSellingPanel key={`buy-${resetKey}`} topic={topic} sections={sections} onChipsChange={handleChips} />
       )}
     </aside>
   )

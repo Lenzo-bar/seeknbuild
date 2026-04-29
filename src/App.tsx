@@ -61,6 +61,7 @@ export default function App() {
   const [subMode,      setSubMode]      = useState('')
   const [activeChips,  setActiveChips]  = useState<ActiveFilterChip[]>([])
   const [filterCat,    setFilterCat]    = useState<FilterCategory>('general')
+  const [filterResetKey, setFilterResetKey] = useState(0)
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme])
 
@@ -88,7 +89,11 @@ export default function App() {
   }, [])
 
   function removeChip(id: string) {
-    setActiveChips(prev => prev.filter(c => c.id !== id))
+    setActiveChips(prev => {
+      const next = prev.filter(c => c.id !== id)
+      if (next.length === 0) setFilterResetKey(k => k + 1)
+      return next
+    })
   }
 
   const expandedCard = expandedId
@@ -127,6 +132,7 @@ export default function App() {
             topic={currentTopic || ''}
             sections={sidebarFilters}
             isSearching={isSearching}
+            resetKey={filterResetKey}
             onRefine={handleRefine}
           />
         </aside>
@@ -151,7 +157,7 @@ export default function App() {
           <ActiveFilterChips
             chips={activeChips}
             onRemove={removeChip}
-            onClearAll={() => setActiveChips([])}
+            onClearAll={() => { setActiveChips([]); setFilterResetKey(k => k + 1) }}
           />
 
           {apiError && (
