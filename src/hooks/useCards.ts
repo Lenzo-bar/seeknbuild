@@ -3,49 +3,183 @@ import type { SearchCard, LinkResult, FilterState, CardZone, SidebarFilterSectio
 import { MORE_CARDS } from '../data/integralCards'
 import { parseFileToCards } from '../utils/fileParser'
 
-async function fetchLiveResults(query: string, searchMode: SearchMode, subMode: string) {
-  const res = await fetch('/api/search', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, searchMode, subMode }),
-  })
-  const data = await res.json()
-  if (data.error) throw new Error(data.error + (data.preview ? ` | preview: ${data.preview}` : ''))
+const DEFAULT_FILTERS: Record<string, SidebarFilterSection[]> = {
+  'real-estate': [
+    { id: 'price',   label: 'Price Range',  type: 'range',      unit: '$' },
+    { id: 'beds',    label: 'Bedrooms',     type: 'radio',      options: ['Any','1','2','3','4','5+'] },
+    { id: 'type',    label: 'Property Type',type: 'checkboxes', options: ['House','Condo','Townhouse','Land'] },
+    { id: 'listing', label: 'Listing Type', type: 'radio',      options: ['For Sale','For Rent'] },
+  ],
+  automotive: [
+    { id: 'make',  label: 'Make',       type: 'checkboxes', options: ['Toyota','Honda','Ford','Chevrolet','BMW','Hyundai'] },
+    { id: 'year',  label: 'Year Range', type: 'range',      unit: '' },
+    { id: 'price', label: 'Price',      type: 'range',      unit: '$' },
+    { id: 'cond',  label: 'Condition',  type: 'radio',      options: ['New','Used','Certified Pre-Owned'] },
+  ],
+  shopping: [
+    { id: 'price',  label: 'Price Range', type: 'range', unit: '$' },
+    { id: 'rating', label: 'Min Rating',  type: 'radio', options: ['Any','3+ stars','4+ stars'] },
+  ],
+  sports: [
+    { id: 'league', label: 'League', type: 'checkboxes', options: ['NBA','NFL','NHL','MLB','MLS'] },
+    { id: 'date',   label: 'Date',   type: 'select',     options: ['Today','This week','This month'] },
+  ],
+  news: [
+    { id: 'date',   label: 'Date',   type: 'select',     options: ['Today','This week','This month'] },
+    { id: 'source', label: 'Source', type: 'checkboxes', options: ['News','Blog','Official'] },
+  ],
+  general: [
+    { id: 'ctype', label: 'Content Type', type: 'checkboxes', options: ['Article','Video','Forum','Blog'] },
+    { id: 'date',  label: 'Date',         type: 'select',     options: ['Any time','Past week','Past month'] },
+  ],
+}
 
-  const cards: SearchCard[] = (data.cards ?? []).map((r: SearchCard & { url?: string }, i: number) => ({
-    id:            r.id ?? `web-${i}`,
-    zone:          'web' as CardZone,
-    type:          (r.type as SearchCard['type']) ?? 'article',
-    rank:          r.rank ?? i + 1,
-    title:         r.title ?? 'Untitled',
-    source:        (r as { url?: string }).url ?? (r as SearchCard).source ?? '',
-    snippet:       r.snippet ?? '',
-    tags:          Array.isArray(r.tags) ? r.tags : [],
-    hasVideo:      r.type === 'video',
-    visible:       true,
-    docSelected:   false,
-    imageUrl:      r.imageUrl,
-    videoChannel:  r.videoChannel,
-    videoDuration: r.videoDuration,
-    publishedAt:   r.publishedAt,
-    outlet:        r.outlet,
-    price:         r.price,
-    rating:        r.rating,
-    upvotes:       r.upvotes,
-    replies:       r.replies,
-    forum:         r.forum,
-  }))
+function detectTopic(query: string): string {
+  const q = query.toLowerCase()
+  if (/house|home|condo|apartment|rent|mortgage|real.?estate|bedroom|property|mls|zillow|realtor/.test(q)) return 'real-estate'
+  if (/car|truck|suv|vehicle|toyota|honda|ford|chevrolet|bmw|mercedes|auto|dealership/.test(q)) return 'automotive'
+  if (/buy|shop|price|deal|discount|amazon|product|review/.test(q)) return 'shopping'
+  if (/nba|nfl|nhl|mlb|soccer|football|basketball|baseball|hockey|sport|score|team|player/.test(q)) return 'sports'
+  if (/news|breaking|latest|today|report|headline/.test(q)) return 'news'
+  if (/movie|show|music|game|netflix|spotify|entertainment/.test(q)) return 'entertainment'
+  if (/recipe|cook|food|restaurant/.test(q)) return 'travel'
+  return 'general'
+}
 
-  const links: LinkResult[] = (data.links ?? []).map((r: LinkResult) => ({
-    id: r.id, rank: r.rank, title: r.title, url: r.url, snippet: r.snippet,
-  }))
+async function callAnthropicDirect(query: string, searchMode: SearchMode, subMode: string): Promise<{
+  cards: SearchCard[]
+  links: LinkResult[]
+  sidebarFilters: SidebarFilterSection[]
+}> {
+  // Get API key from environment (Vite exposes VITE_ prefixed vars to the browser)
+  const KEY = (import.meta as { env: Record<string, string> }).env.VITE_ANTHROPIC_API_KEY
 
-  return {
-    cards,
-    links,
-    sidebarFilters: (data.sidebarFilters ?? []) as SidebarFilterSection[],
-    topic: (data.topic ?? 'general') as string,
+  if (!KEY) {
+    throw new Error('VITE_ANTHROPIC_API_KEY not found. Add it to your .env.local file.')
   }
+
+  const modeHint: Record<string, string> = {
+    all: 'broad mix of results', news: 'recent news articles', images: 'image results',
+    videos: 'video results', forums: 'forum posts', shopping: 'product listings',
+    entertainment: 'entertainment content', sports: 'sports news and scores', hobby: 'hobby guides',
+  }
+
+  const prompt = `Search the web for: "${query}"
+Mode: ${searchMode}${subMode ? ` > ${subMode}` : ''}. Return ${modeHint[searchMode] || 'relevant results'}.
+
+Reply with ONLY a JSON object. No markdown. No explanation. Must start with { and end with }.
+
+{
+  "synthesis": "2-3 sentence answer to the query based on search results",
+  "topic": "one of: general|real-estate|automotive|shopping|sports|news|entertainment|hobby|tech|health|travel|finance",
+  "cards": [
+    {"title":"Result title","url":"https://example.com","snippet":"Description of result","tags":["tag1","tag2"]}
+  ],
+  "sidebarFilters": [
+    {"id":"price","label":"Price Range","type":"range","unit":"$"},
+    {"id":"type","label":"Type","type":"checkboxes","options":["Option A","Option B"]}
+  ]
+}
+
+Generate 8-15 cards matching the query. Generate 3-5 sidebar filters matching the query domain.
+Filter types: "checkboxes" | "radio" | "select" | "range" (range needs "unit" field).
+Output ONLY the JSON.`
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'web-search-2025-03-05',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 4000,
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  })
+
+  const rawText = await res.text()
+  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${rawText.slice(0, 200)}`)
+
+  let apiData: { content?: Array<{ type: string; text?: string }>; stop_reason?: string }
+  try { apiData = JSON.parse(rawText) }
+  catch { throw new Error(`Could not parse API response: ${rawText.slice(0, 100)}`) }
+
+  const textBlock = apiData.content?.find(b => b.type === 'text')
+  if (!textBlock?.text) {
+    const types = apiData.content?.map(b => b.type).join(', ')
+    throw new Error(`No text in response. Block types: ${types}. Stop reason: ${apiData.stop_reason}`)
+  }
+
+  let txt = textBlock.text.trim()
+    .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
+  const s = txt.indexOf('{')
+  const e = txt.lastIndexOf('}')
+  if (s === -1 || e === -1) throw new Error(`No JSON found in response: ${txt.slice(0, 100)}`)
+
+  let parsed: {
+    synthesis?: string
+    topic?: string
+    cards?: Array<Record<string, unknown>>
+    sidebarFilters?: SidebarFilterSection[]
+  }
+  try { parsed = JSON.parse(txt.slice(s, e + 1)) }
+  catch (err) { throw new Error(`JSON parse failed: ${(err as Error).message} | text: ${txt.slice(s, s + 100)}`) }
+
+  const rawCards  = Array.isArray(parsed.cards) ? parsed.cards : []
+  const synthesis = typeof parsed.synthesis === 'string' ? parsed.synthesis : ''
+  const topic     = parsed.topic || detectTopic(query)
+
+  const aiFilters = Array.isArray(parsed.sidebarFilters) && parsed.sidebarFilters.length > 0
+    ? parsed.sidebarFilters
+    : (DEFAULT_FILTERS[topic] || DEFAULT_FILTERS.general)
+
+  const cards: SearchCard[] = []
+  if (synthesis) {
+    cards.push({
+      id: 'synthesis-0', zone: 'web', rank: 0, type: 'article',
+      title: `Summary: ${query.slice(0, 55)}${query.length > 55 ? '…' : ''}`,
+      source: '', snippet: synthesis, tags: ['AI summary'],
+      hasVideo: false, visible: true, docSelected: false,
+    })
+  }
+
+  const typeMap: Record<string, SearchCard['type']> = {
+    videos: 'video', images: 'image', news: 'news', forums: 'forum', shopping: 'shopping'
+  }
+  rawCards.slice(0, 20).forEach((r, i) => {
+    cards.push({
+      id: `web-${i}`, zone: 'web', rank: i + 1,
+      type: typeMap[searchMode] || 'article',
+      title:         String(r.title   ?? 'Untitled'),
+      source:        String(r.url     ?? ''),
+      snippet:       String(r.snippet ?? ''),
+      tags:          Array.isArray(r.tags) ? r.tags as string[] : [],
+      hasVideo:      searchMode === 'videos',
+      visible:       true,
+      docSelected:   false,
+      imageUrl:      r.imageUrl      as string | undefined,
+      videoChannel:  r.videoChannel  as string | undefined,
+      videoDuration: r.videoDuration as string | undefined,
+      publishedAt:   r.publishedAt   as string | undefined,
+      outlet:        r.outlet        as string | undefined,
+      price:         r.price         as string | undefined,
+      rating:        typeof r.rating === 'number' ? r.rating : undefined,
+      upvotes:       r.upvotes       as number | undefined,
+      replies:       r.replies       as number | undefined,
+      forum:         r.forum         as string | undefined,
+    })
+  })
+
+  const links: LinkResult[] = rawCards.slice(20).map((r, i) => ({
+    id: `link-${i}`, rank: 21 + i,
+    title: String(r.title ?? 'Untitled'), url: String(r.url ?? ''), snippet: String(r.snippet ?? ''),
+  }))
+
+  return { cards, links, sidebarFilters: aiFilters }
 }
 
 export function useCards() {
@@ -69,13 +203,15 @@ export function useCards() {
     setApiError(null)
     setWebCards([])
     setLinkResults([])
-    setSidebarFilters([])
+    // Show default filters immediately based on query topic while searching
+    const immediateFilters = DEFAULT_FILTERS[detectTopic(query)] || DEFAULT_FILTERS.general
+    setSidebarFilters(immediateFilters)
 
     try {
-      const live = await fetchLiveResults(query, searchMode, subMode)
-      setWebCards(live.cards)
-      setLinkResults(live.links)
-      setSidebarFilters(live.sidebarFilters)
+      const result = await callAnthropicDirect(query, searchMode, subMode)
+      setWebCards(result.cards)
+      setLinkResults(result.links)
+      setSidebarFilters(result.sidebarFilters)
     } catch (err) {
       setApiError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -103,32 +239,26 @@ export function useCards() {
 
   const addMoreQuestion = useCallback(async (question: string) => {
     try {
-      const live = await fetchLiveResults(question, 'all', '')
+      const result = await callAnthropicDirect(question, 'all', '')
       const stamp = Date.now()
-      setMoreCards(prev => [...prev, ...live.cards.map((c, i) => ({
+      setMoreCards(prev => [...prev, ...result.cards.map((c, i) => ({
         ...c, id: `more-${stamp}-${i}`, zone: 'more' as CardZone,
       }))])
     } catch {
       const stamp = Date.now()
       setMoreCards(prev => [
         ...prev,
-        ...MORE_CARDS.map(c => ({ ...c, id: c.id + '_' + stamp, visible: true, docSelected: false })),
+        ...MORE_CARDS.map(c => ({ ...c, id: `${c.id}_${stamp}`, visible: true, docSelected: false })),
       ])
     }
   }, [])
 
   const refine = useCallback((filters: FilterState) => {
     setWebCards(prev => prev.map(card => {
-      const { learnerLevel, extraFilter } = filters
+      const { learnerLevel } = filters
       let visible = true
-      if (extraFilter && extraFilter !== 'Select a filter...') {
-        visible = card.tags.some(t =>
-          ['physics','work','vector field','flux','convergence','improper',
-           'singularity','advanced','3D','volume','flux','surface','mass'].includes(t)
-        )
-      }
       if (learnerLevel && learnerLevel !== 'All levels') {
-        if (learnerLevel === 'High school') visible = visible && card.rank <= 4
+        if (learnerLevel === 'High school') visible = card.rank <= 4
       }
       return { ...card, visible }
     }))
