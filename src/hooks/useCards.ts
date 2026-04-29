@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import type { SearchCard, LinkResult, FilterState, CardZone, SidebarFilterSection, SearchMode } from '../types'
+import type { SearchCard, LinkResult, FilterState, CardZone, SidebarFilterSection, SearchMode, ActiveFilterChip } from '../types'
 import { MORE_CARDS } from '../data/integralCards'
 import { parseFileToCards } from '../utils/fileParser'
 
@@ -250,26 +250,38 @@ export function useCards() {
     })
   }, [])
 
-  // Re-run search with filter context appended to original query
-  const refineSearch = useCallback(async (filterSummary: string) => {
-    if (!lastQuery) return
-    const refinedQuery = `${lastQuery} — filter by: ${filterSummary}`
-    setIsSearching(true)
-    setApiError(null)
-    setWebCards([])
-    setLinkResults([])
-    try {
-      const result = await callSearchAPI(refinedQuery, lastMode, lastSubMode)
-      setWebCards(result.cards)
-      setLinkResults(result.links)
-      setSidebarFilters(result.sidebarFilters)
-      setCurrentTopic(result.topic || '')
-    } catch (err) {
-      setApiError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setIsSearching(false)
+  // Filter existing cards client-side — no API call, sidebar untouched
+  const clientRefine = useCallback((chips: ActiveFilterChip[]) => {
+    if (chips.length === 0) {
+      // No active filters — show all cards
+      setWebCards(prev => prev.map(c => ({ ...c, visible: true })))
+      return
     }
-  }, [lastQuery, lastMode, lastSubMode])
+
+    setWebCards(prev => prev.map(card => {
+      // Full text to match against
+      const cardText = [
+        card.title, card.snippet, card.source,
+        ...(card.tags || []),
+        card.price || '',
+        card.outlet || '',
+        card.forum || '',
+        card.videoChannel || '',
+      ].join(' ').toLowerCase()
+
+      for (const chip of chips) {
+        // Skip range chips — can't reliably parse from card text client-side
+        if (chip.id === 'price' || chip.id === 'year' || chip.id === 'sqft' ||
+            chip.id === 'km'    || chip.id === 'age'  || chip.id === 'beds' ||
+            chip.id === 'baths') continue
+
+        const val = chip.value.toLowerCase()
+        if (!cardText.includes(val)) return { ...card, visible: false }
+      }
+
+      return { ...card, visible: true }
+    }))
+  }, [])
 
   const allSelected = [
     ...webCards.filter(c => c.docSelected && c.visible && !c.hasVideo),
@@ -285,7 +297,7 @@ export function useCards() {
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
     isSearching, isAnalyzing,
     search, analyze, addMoreQuestion,
-    refine, refineSearch, clearWeb, clearFile, clearMore, reset,
+    refine, clientRefine, clearWeb, clearFile, clearMore, reset,
     dismissCard, toggleDocSelect, clearDocSelections, reorderCards,
     convertLinksToCards,
   }
