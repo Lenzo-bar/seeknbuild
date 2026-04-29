@@ -16,6 +16,7 @@ interface Props {
   resetKey:      number                   // increment to force-reset all filters
   removedChipId: string | null            // id of chip just removed individually
   onRefine:      (chips: ActiveFilterChip[]) => void
+  onApply:       (chips: ActiveFilterChip[]) => void
 }
 
 // ── Skeleton loader ───────────────────────────────────────────────
@@ -62,10 +63,11 @@ function SkeletonAcademia() {
 }
 
 // ── Academia panel ────────────────────────────────────────────────
-function AcademiaPanel({ topic, onChipsChange, removedChipId }: {
+function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
   topic: string
   removedChipId: string | null
   onChipsChange: (chips: ActiveFilterChip[]) => void
+  onApply: (chips: ActiveFilterChip[]) => void
 }) {
   const key = Object.keys(ACADEMIA_PRIMARIES).find(k => topic.includes(k)) || 'default'
   const primaries  = ACADEMIA_PRIMARIES[key]
@@ -161,7 +163,16 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId }: {
         </div>
       </div>
 
-      <button className={styles.applyBtn} onClick={() => {/* chips already emitted live */}}>
+      <button className={styles.applyBtn} onClick={() => {
+        const chips: ActiveFilterChip[] = []
+        Object.entries(checks).forEach(([label, on]) => {
+          if (on) chips.push({ id: `ck-${label}`, label, value: label, category: 'academia' })
+        })
+        if (level) chips.push({ id: 'level', label: 'Level', value: level, category: 'academia' })
+        if (secA)  chips.push({ id: 'secA', label: 'Sub-topic', value: secA, category: 'academia' })
+        if (secB)  chips.push({ id: 'secB', label: 'Format', value: secB, category: 'academia' })
+        onApply(chips)
+      }}>
         Apply filters
       </button>
     </div>
@@ -169,11 +180,12 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId }: {
 }
 
 // ── Buying/Selling panel ──────────────────────────────────────────
-function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId }: {
+function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onApply }: {
   topic: string
   sections: SidebarFilterSection[]
   removedChipId: string | null
   onChipsChange: (chips: ActiveFilterChip[]) => void
+  onApply: (chips: ActiveFilterChip[]) => void
 }) {
   const topicKey = Object.keys(BUYING_SELLING_FILTERS).find(k => topic.includes(k)) || 'general'
   const displaySections = sections.length > 0 ? sections : BUYING_SELLING_FILTERS[topicKey] || BUYING_SELLING_FILTERS.general
@@ -290,7 +302,27 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId }: {
           )}
         </div>
       ))}
-      <button className={styles.applyBtn} onClick={() => {/* chips emitted live */}}>
+      <button className={styles.applyBtn} onClick={() => {
+        const chips: ActiveFilterChip[] = []
+        displaySections.forEach(sec => {
+          const v = values[sec.id]
+          if (!v) return
+          if (sec.type === 'checkboxes' && typeof v === 'object') {
+            Object.entries(v as Record<string,boolean>).forEach(([opt, on]) => {
+              if (on) chips.push({ id: `${sec.id}-${opt}`, label: sec.label, value: opt, category: 'buying-selling' })
+            })
+          } else if (sec.type === 'radio' || sec.type === 'select') {
+            if (v) chips.push({ id: sec.id, label: sec.label, value: String(v), category: 'buying-selling' })
+          } else if (sec.type === 'range') {
+            const r = v as { min?: string; max?: string }
+            if (r.min || r.max) {
+              const val = [r.min && `${sec.unit || ''}${r.min}`, r.max && `${sec.unit || ''}${r.max}`].filter(Boolean).join(' – ')
+              chips.push({ id: sec.id, label: sec.label, value: val, category: 'buying-selling' })
+            }
+          }
+        })
+        onApply(chips)
+      }}>
         Apply filters
       </button>
     </div>
@@ -298,7 +330,7 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId }: {
 }
 
 // ── Main export ───────────────────────────────────────────────────
-export function SidebarFilters({ category, topic, sections, isSearching, resetKey, removedChipId, onRefine }: Props) {
+export function SidebarFilters({ category, topic, sections, isSearching, resetKey, removedChipId, onRefine, onApply }: Props) {
   const [chips, setChips] = useState<ActiveFilterChip[]>([])
 
   // When resetKey changes (from parent Clear All), wipe local chips too
@@ -329,9 +361,9 @@ export function SidebarFilters({ category, topic, sections, isSearching, resetKe
         category === 'academia' ? <SkeletonAcademia /> : <SkeletonBuying />
       ) : category === 'academia' ? (
         // key=resetKey forces full remount → resets all checkboxes/dropdowns
-        <AcademiaPanel key={`acad-${resetKey}`} topic={topic} removedChipId={removedChipId} onChipsChange={handleChips} />
+        <AcademiaPanel key={`acad-${resetKey}`} topic={topic} removedChipId={removedChipId} onChipsChange={handleChips} onApply={onApply} />
       ) : (
-        <BuyingSellingPanel key={`buy-${resetKey}`} topic={topic} sections={sections} removedChipId={removedChipId} onChipsChange={handleChips} />
+        <BuyingSellingPanel key={`buy-${resetKey}`} topic={topic} sections={sections} removedChipId={removedChipId} onChipsChange={handleChips} onApply={onApply} />
       )}
     </aside>
   )

@@ -45,7 +45,7 @@ export default function App() {
     webCards, fileCards, moreCards, linkResults, allSelected, sidebarFilters, apiError,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
     isAnalyzing, isSearching, currentTopic,
-    search, analyze, addMoreQuestion,
+    search, analyze, addMoreQuestion, refineSearch,
     clearWeb, clearFile, reset,
     dismissCard, toggleDocSelect, clearDocSelections, reorderCards,
     convertLinksToCards,
@@ -86,8 +86,17 @@ export default function App() {
 
   const handleRefine = useCallback((chips: ActiveFilterChip[]) => {
     setActiveChips(chips)
-    // Future: filter webCards by chips
   }, [])
+
+  const handleApply = useCallback((chips: ActiveFilterChip[]) => {
+    setActiveChips(chips)
+    if (chips.length === 0) return
+    // Build a human-readable filter summary to append to the query
+    const summary = chips
+      .map(c => `${c.label}: ${c.value}`)
+      .join(', ')
+    refineSearch(summary)
+  }, [refineSearch])
 
   function removeChip(id: string) {
     setActiveChips(prev => {
@@ -141,6 +150,7 @@ export default function App() {
             resetKey={filterResetKey}
             removedChipId={removedChipId}
             onRefine={handleRefine}
+            onApply={handleApply}
           />
         </aside>
 

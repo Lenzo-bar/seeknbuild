@@ -121,6 +121,9 @@ export function useCards() {
   const [isSearching,    setIsSearching]    = useState(false)
   const [isAnalyzing,    setIsAnalyzing]    = useState(false)
   const [apiError,       setApiError]       = useState<string | null>(null)
+  const [lastQuery,      setLastQuery]      = useState<string>('')
+  const [lastMode,       setLastMode]       = useState<SearchMode>('all')
+  const [lastSubMode,    setLastSubMode]    = useState<string>('')
   const [currentTopic,   setCurrentTopic]   = useState<string>("")
 
   const hasWeb   = webCards.length  > 0
@@ -137,6 +140,9 @@ export function useCards() {
     // Show immediate default filters while waiting
     setSidebarFilters(DEFAULT_FILTERS[detectTopic(query)] || DEFAULT_FILTERS.general)
 
+    setLastQuery(query)
+    setLastMode(searchMode)
+    setLastSubMode(subMode)
     try {
       const result = await callSearchAPI(query, searchMode, subMode)
       setWebCards(result.cards)
@@ -244,6 +250,27 @@ export function useCards() {
     })
   }, [])
 
+  // Re-run search with filter context appended to original query
+  const refineSearch = useCallback(async (filterSummary: string) => {
+    if (!lastQuery) return
+    const refinedQuery = `${lastQuery} — filter by: ${filterSummary}`
+    setIsSearching(true)
+    setApiError(null)
+    setWebCards([])
+    setLinkResults([])
+    try {
+      const result = await callSearchAPI(refinedQuery, lastMode, lastSubMode)
+      setWebCards(result.cards)
+      setLinkResults(result.links)
+      setSidebarFilters(result.sidebarFilters)
+      setCurrentTopic(result.topic || '')
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setIsSearching(false)
+    }
+  }, [lastQuery, lastMode, lastSubMode])
+
   const allSelected = [
     ...webCards.filter(c => c.docSelected && c.visible && !c.hasVideo),
     ...fileCards.filter(c => c.docSelected && c.visible && !c.hasVideo),
@@ -258,7 +285,7 @@ export function useCards() {
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
     isSearching, isAnalyzing,
     search, analyze, addMoreQuestion,
-    refine, clearWeb, clearFile, clearMore, reset,
+    refine, refineSearch, clearWeb, clearFile, clearMore, reset,
     dismissCard, toggleDocSelect, clearDocSelections, reorderCards,
     convertLinksToCards,
   }
