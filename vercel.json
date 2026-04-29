@@ -1,10 +1,5 @@
 {
   "buildCommand": "npm install --legacy-peer-deps && npm run build",
   "outputDirectory": "dist",
-  "framework": "vite",
-  "functions": {
-    "api/search.js": {
-      "runtime": "nodejs20.x"
-    }
-  }
+  "framework": "vite"
 }
