@@ -114,6 +114,8 @@ async function callSearchAPI(query: string, searchMode: SearchMode, subMode: str
 
 export function useCards() {
   const [webCards,       setWebCards]       = useState<SearchCard[]>([])
+  const [allWebCards,    setAllWebCards]    = useState<SearchCard[]>([]) // master — never filtered
+  const [hasSearched,    setHasSearched]    = useState(false)
   const [fileCards,      setFileCards]      = useState<SearchCard[]>([])
   const [moreCards,      setMoreCards]      = useState<SearchCard[]>([])
   const [linkResults,    setLinkResults]    = useState<LinkResult[]>([])
@@ -143,9 +145,11 @@ export function useCards() {
     setLastQuery(query)
     setLastMode(searchMode)
     setLastSubMode(subMode)
+    setHasSearched(true)
     try {
       const result = await callSearchAPI(query, searchMode, subMode)
       setWebCards(result.cards)
+      setAllWebCards(result.cards)
       setLinkResults(result.links)
       setSidebarFilters(result.sidebarFilters)
       setCurrentTopic(result.topic || "")
@@ -201,12 +205,12 @@ export function useCards() {
     }))
   }, [])
 
-  const clearWeb  = useCallback(() => { setWebCards([]); setLinkResults([]) }, [])
+  const clearWeb  = useCallback(() => { setWebCards([]); setAllWebCards([]); setLinkResults([]); setHasSearched(false) }, [])
   const clearFile = useCallback(() => { setFileCards([]) }, [])
   const clearMore = useCallback(() => { setMoreCards([]) }, [])
   const reset     = useCallback(() => {
-    setWebCards([]); setFileCards([]); setMoreCards([])
-    setLinkResults([]); setSidebarFilters([]); setApiError(null)
+    setWebCards([]); setAllWebCards([]); setFileCards([]); setMoreCards([])
+    setLinkResults([]); setSidebarFilters([]); setApiError(null); setHasSearched(false)
   }, [])
 
   const dismissCard = useCallback((id: string, zone: CardZone) => {
@@ -251,36 +255,37 @@ export function useCards() {
   }, [])
 
   // Filter existing cards client-side — no API call, sidebar untouched
+  // Always filters from allWebCards (master) so dismiss+filter don't conflict
   const clientRefine = useCallback((chips: ActiveFilterChip[]) => {
-    if (chips.length === 0) {
-      // No active filters — show all cards
-      setWebCards(prev => prev.map(c => ({ ...c, visible: true })))
-      return
-    }
+    setAllWebCards(master => {
+      // Restore dismissed cards before filtering (dismissed have visible:false from dismissCard)
+      // We keep a separate dismissed set via the card's original visible flag
+      // allWebCards always stores the original unfiltered set with visible:true
+      const RANGE_IDS = new Set(['price','year','sqft','km','age','beds','baths'])
 
-    setWebCards(prev => prev.map(card => {
-      // Full text to match against
-      const cardText = [
-        card.title, card.snippet, card.source,
-        ...(card.tags || []),
-        card.price || '',
-        card.outlet || '',
-        card.forum || '',
-        card.videoChannel || '',
-      ].join(' ').toLowerCase()
+      const filtered = master.map(card => {
+        if (chips.length === 0) return { ...card, visible: true }
 
-      for (const chip of chips) {
-        // Skip range chips — can't reliably parse from card text client-side
-        if (chip.id === 'price' || chip.id === 'year' || chip.id === 'sqft' ||
-            chip.id === 'km'    || chip.id === 'age'  || chip.id === 'beds' ||
-            chip.id === 'baths') continue
+        const cardText = [
+          card.title, card.snippet, card.source,
+          ...(card.tags || []),
+          card.price        || '',
+          card.outlet       || '',
+          card.forum        || '',
+          card.videoChannel || '',
+        ].join(' ').toLowerCase()
 
-        const val = chip.value.toLowerCase()
-        if (!cardText.includes(val)) return { ...card, visible: false }
-      }
+        for (const chip of chips) {
+          if (RANGE_IDS.has(chip.id)) continue // skip ranges
+          const val = chip.value.toLowerCase()
+          if (!cardText.includes(val)) return { ...card, visible: false }
+        }
+        return { ...card, visible: true }
+      })
 
-      return { ...card, visible: true }
-    }))
+      setWebCards(filtered)
+      return master // allWebCards stays unchanged
+    })
   }, [])
 
   const allSelected = [
@@ -293,7 +298,7 @@ export function useCards() {
     webCards:  webCards.filter(c => c.visible),
     fileCards: fileCards.filter(c => c.visible),
     moreCards: moreCards.filter(c => c.visible),
-    linkResults, allSelected, sidebarFilters, apiError, currentTopic,
+    linkResults, allSelected, sidebarFilters, apiError, currentTopic, hasSearched,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
     isSearching, isAnalyzing,
     search, analyze, addMoreQuestion,

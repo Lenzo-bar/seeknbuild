@@ -8,6 +8,7 @@ interface Props {
   hasFile:     boolean
   isAnalyzing: boolean
   isSearching: boolean
+  hasSearched: boolean
   searchMode:  SearchMode
   subMode:     string
   onSearch:       (query: string, mode: SearchMode, sub: string) => void
@@ -19,7 +20,7 @@ interface Props {
 }
 
 export function PromptBox({
-  hasAny, hasWeb, hasFile, isAnalyzing, isSearching,
+  hasAny, hasWeb, hasFile, isAnalyzing, isSearching, hasSearched,
   searchMode, subMode,
   onSearch, onAnalyze, onMoreQuestion,
   onClearWeb, onClearFile, onReset,
@@ -28,11 +29,14 @@ export function PromptBox({
   const [mode,   setMode]   = useState<AppMode>('web')
   const [mathOn, setMathOn] = useState(true)
   const [deepOn, setDeepOn] = useState(false)
-  const [file,   setFile]   = useState<File | null>(null)
+  const [file,         setFile]         = useState<File | null>(null)
+  const [queryEdited,  setQueryEdited]   = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const isFile     = mode === 'file'
-  const canSearch  = !isFile && query.trim().length > 0 && !isSearching
+  // Search button: active only before first search, or after manual text edit
+  const searchLocked = hasSearched && !queryEdited
+  const canSearch  = !isFile && query.trim().length > 0 && !isSearching && !searchLocked
   const canAnalyze = isFile && !!file && !isAnalyzing
   const canMoreQ   = hasAny
   const canClearW  = hasWeb
@@ -52,12 +56,12 @@ export function PromptBox({
   }
 
   function handleReset() {
-    setQuery(''); setFile(null); setMode('web')
+    setQuery(''); setFile(null); setMode('web'); setQueryEdited(false)
     onReset()
   }
 
   function handleSearch() {
-    if (canSearch) onSearch(query, searchMode, subMode)
+    if (canSearch) { onSearch(query, searchMode, subMode); setQueryEdited(false) }
   }
 
   return (
@@ -79,7 +83,7 @@ export function PromptBox({
       <textarea
         className={styles.textarea}
         value={query}
-        onChange={e => setQuery(e.target.value)}
+        onChange={e => { setQuery(e.target.value); setQueryEdited(true) }}
         onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSearch() }}
         placeholder="Ask anything, search any topic — results appear as interactive cards…"
         rows={3}
@@ -121,6 +125,8 @@ export function PromptBox({
           disabled={!canSearch} onClick={handleSearch}>
           {isSearching
             ? <><span className={styles.spinner} /> Searching…</>
+            : searchLocked
+            ? <><SearchIcon /> Edit prompt to search again</>
             : <><SearchIcon /> Search</>}
         </button>
 

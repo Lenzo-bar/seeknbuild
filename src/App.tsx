@@ -44,7 +44,7 @@ export default function App() {
   const {
     webCards, fileCards, moreCards, linkResults, allSelected, sidebarFilters, apiError,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
-    isAnalyzing, isSearching, currentTopic,
+    isAnalyzing, isSearching, hasSearched, currentTopic,
     search, analyze, addMoreQuestion, clientRefine,
     clearWeb, clearFile, reset,
     dismissCard, toggleDocSelect, clearDocSelections, reorderCards,
@@ -157,6 +157,7 @@ export default function App() {
           <PromptBox
             hasAny={hasAny} hasWeb={hasWeb||hasLinks} hasFile={hasFile}
             isAnalyzing={isAnalyzing} isSearching={isSearching}
+            hasSearched={hasSearched}
             searchMode={searchMode} subMode={subMode}
             onSearch={(q, _mode, _sub) => handleSearch(q)}
             onAnalyze={f => { analyze(f); setExpandedId(null) }}
