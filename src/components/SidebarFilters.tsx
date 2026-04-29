@@ -13,8 +13,9 @@ interface Props {
   topic:       string
   sections:    SidebarFilterSection[]   // for buying-selling (from API)
   isSearching: boolean
-  resetKey:    number                   // increment to force-reset all filters
-  onRefine:    (chips: ActiveFilterChip[]) => void
+  resetKey:      number                   // increment to force-reset all filters
+  removedChipId: string | null            // id of chip just removed individually
+  onRefine:      (chips: ActiveFilterChip[]) => void
 }
 
 // ── Skeleton loader ───────────────────────────────────────────────
@@ -61,8 +62,9 @@ function SkeletonAcademia() {
 }
 
 // ── Academia panel ────────────────────────────────────────────────
-function AcademiaPanel({ topic, onChipsChange }: {
+function AcademiaPanel({ topic, onChipsChange, removedChipId }: {
   topic: string
+  removedChipId: string | null
   onChipsChange: (chips: ActiveFilterChip[]) => void
 }) {
   const key = Object.keys(ACADEMIA_PRIMARIES).find(k => topic.includes(k)) || 'default'
@@ -77,6 +79,19 @@ function AcademiaPanel({ topic, onChipsChange }: {
 
   // Reset when topic changes
   useEffect(() => { setChecks({}); setLevel(''); setSecA(''); setSecB('') }, [topic])
+
+  // Uncheck individual item when its chip is removed
+  useEffect(() => {
+    if (!removedChipId) return
+    if (removedChipId === 'level') { setLevel(''); return }
+    if (removedChipId === 'secA')  { setSecA('');  return }
+    if (removedChipId === 'secB')  { setSecB('');  return }
+    // checkbox chip ids are "ck-{label}"
+    if (removedChipId.startsWith('ck-')) {
+      const label = removedChipId.slice(3)
+      setChecks(prev => ({ ...prev, [label]: false }))
+    }
+  }, [removedChipId])
 
   // Emit chips whenever any value changes
   useEffect(() => {
@@ -154,9 +169,10 @@ function AcademiaPanel({ topic, onChipsChange }: {
 }
 
 // ── Buying/Selling panel ──────────────────────────────────────────
-function BuyingSellingPanel({ topic, sections, onChipsChange }: {
+function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId }: {
   topic: string
   sections: SidebarFilterSection[]
+  removedChipId: string | null
   onChipsChange: (chips: ActiveFilterChip[]) => void
 }) {
   const topicKey = Object.keys(BUYING_SELLING_FILTERS).find(k => topic.includes(k)) || 'general'
@@ -165,6 +181,30 @@ function BuyingSellingPanel({ topic, sections, onChipsChange }: {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   useEffect(() => { setValues({}) }, [topic])
+
+  // Remove individual filter when chip x is clicked
+  useEffect(() => {
+    if (!removedChipId) return
+    setValues(prev => {
+      const next = { ...prev }
+      // Range / radio / select chip id is just the section id
+      if (next[removedChipId] !== undefined) {
+        delete next[removedChipId]
+        return next
+      }
+      // Checkbox chip id is "{sectionId}-{option}"
+      const dashIdx = removedChipId.lastIndexOf('-')
+      if (dashIdx > 0) {
+        const secId = removedChipId.slice(0, dashIdx)
+        const opt   = removedChipId.slice(dashIdx + 1)
+        if (next[secId] && typeof next[secId] === 'object') {
+          next[secId] = { ...(next[secId] as Record<string,boolean>), [opt]: false }
+          return next
+        }
+      }
+      return prev
+    })
+  }, [removedChipId])
 
   useEffect(() => {
     const chips: ActiveFilterChip[] = []
@@ -258,7 +298,7 @@ function BuyingSellingPanel({ topic, sections, onChipsChange }: {
 }
 
 // ── Main export ───────────────────────────────────────────────────
-export function SidebarFilters({ category, topic, sections, isSearching, resetKey, onRefine }: Props) {
+export function SidebarFilters({ category, topic, sections, isSearching, resetKey, removedChipId, onRefine }: Props) {
   const [chips, setChips] = useState<ActiveFilterChip[]>([])
 
   // When resetKey changes (from parent Clear All), wipe local chips too
@@ -289,9 +329,9 @@ export function SidebarFilters({ category, topic, sections, isSearching, resetKe
         category === 'academia' ? <SkeletonAcademia /> : <SkeletonBuying />
       ) : category === 'academia' ? (
         // key=resetKey forces full remount → resets all checkboxes/dropdowns
-        <AcademiaPanel key={`acad-${resetKey}`} topic={topic} onChipsChange={handleChips} />
+        <AcademiaPanel key={`acad-${resetKey}`} topic={topic} removedChipId={removedChipId} onChipsChange={handleChips} />
       ) : (
-        <BuyingSellingPanel key={`buy-${resetKey}`} topic={topic} sections={sections} onChipsChange={handleChips} />
+        <BuyingSellingPanel key={`buy-${resetKey}`} topic={topic} sections={sections} removedChipId={removedChipId} onChipsChange={handleChips} />
       )}
     </aside>
   )

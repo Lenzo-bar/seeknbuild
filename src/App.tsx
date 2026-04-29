@@ -61,7 +61,8 @@ export default function App() {
   const [subMode,      setSubMode]      = useState('')
   const [activeChips,  setActiveChips]  = useState<ActiveFilterChip[]>([])
   const [filterCat,    setFilterCat]    = useState<FilterCategory>('general')
-  const [filterResetKey, setFilterResetKey] = useState(0)
+  const [filterResetKey,  setFilterResetKey]  = useState(0)
+  const [removedChipId,   setRemovedChipId]   = useState<string | null>(null)
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme])
 
@@ -91,7 +92,12 @@ export default function App() {
   function removeChip(id: string) {
     setActiveChips(prev => {
       const next = prev.filter(c => c.id !== id)
-      if (next.length === 0) setFilterResetKey(k => k + 1)
+      if (next.length === 0) {
+        setFilterResetKey(k => k + 1)
+        setRemovedChipId(null)
+      } else {
+        setRemovedChipId(id)
+      }
       return next
     })
   }
@@ -133,6 +139,7 @@ export default function App() {
             sections={sidebarFilters}
             isSearching={isSearching}
             resetKey={filterResetKey}
+            removedChipId={removedChipId}
             onRefine={handleRefine}
           />
         </aside>
