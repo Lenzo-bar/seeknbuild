@@ -45,6 +45,7 @@ export default function App() {
     webCards, fileCards, moreCards, linkResults, allSelected, sidebarFilters, apiError,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
     isAnalyzing, isSearching, hasSearched, currentTopic,
+    isFiltering, searchTime, filterTime, totalCards,
     search, analyze, addMoreQuestion, clientRefine,
     clearWeb, clearFile, reset,
     dismissCard, toggleDocSelect, clearDocSelections, reorderCards,
@@ -192,7 +193,18 @@ export default function App() {
             <DocBar count={allSelected.length} onBuild={() => setShowDoc(true)} onClear={clearDocSelections} />
           )}
 
-          {hasAny && <Toolbar visible={allVisible.length} cols={cols} onColsChange={setCols} />}
+          {(hasAny || isSearching) && (
+            <Toolbar
+              visible={allVisible.length}
+              total={totalCards}
+              cols={cols}
+              isSearching={isSearching}
+              isFiltering={isFiltering}
+              searchTime={searchTime}
+              filterTime={filterTime}
+              onColsChange={setCols}
+            />
+          )}
 
           {expandedCard && (
             <ExpandOverlay card={expandedCard} onClose={() => setExpandedId(null)}

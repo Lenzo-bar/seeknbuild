@@ -116,6 +116,10 @@ export function useCards() {
   const [webCards,       setWebCards]       = useState<SearchCard[]>([])
   const [allWebCards,    setAllWebCards]    = useState<SearchCard[]>([]) // master — never filtered
   const [hasSearched,    setHasSearched]    = useState(false)
+  const [isFiltering,    setIsFiltering]    = useState(false)
+  const [searchTime,     setSearchTime]     = useState<number | null>(null)
+  const [filterTime,     setFilterTime]     = useState<number | null>(null)
+  const [totalCards,     setTotalCards]     = useState(0)
   const [fileCards,      setFileCards]      = useState<SearchCard[]>([])
   const [moreCards,      setMoreCards]      = useState<SearchCard[]>([])
   const [linkResults,    setLinkResults]    = useState<LinkResult[]>([])
@@ -146,10 +150,14 @@ export function useCards() {
     setLastMode(searchMode)
     setLastSubMode(subMode)
     setHasSearched(true)
+    const searchStart = Date.now()
     try {
       const result = await callSearchAPI(query, searchMode, subMode)
       setWebCards(result.cards)
       setAllWebCards(result.cards)
+      setTotalCards(result.cards.length)
+      setSearchTime(Date.now() - searchStart)
+      setFilterTime(null)
       setLinkResults(result.links)
       setSidebarFilters(result.sidebarFilters)
       setCurrentTopic(result.topic || "")
@@ -205,12 +213,13 @@ export function useCards() {
     }))
   }, [])
 
-  const clearWeb  = useCallback(() => { setWebCards([]); setAllWebCards([]); setLinkResults([]); setHasSearched(false) }, [])
+  const clearWeb  = useCallback(() => { setWebCards([]); setAllWebCards([]); setLinkResults([]); setHasSearched(false); setSearchTime(null); setFilterTime(null); setTotalCards(0) }, [])
   const clearFile = useCallback(() => { setFileCards([]) }, [])
   const clearMore = useCallback(() => { setMoreCards([]) }, [])
   const reset     = useCallback(() => {
     setWebCards([]); setAllWebCards([]); setFileCards([]); setMoreCards([])
-    setLinkResults([]); setSidebarFilters([]); setApiError(null); setHasSearched(false)
+    setLinkResults([]); setSidebarFilters([]); setApiError(null)
+    setHasSearched(false); setSearchTime(null); setFilterTime(null); setTotalCards(0)
   }, [])
 
   const dismissCard = useCallback((id: string, zone: CardZone) => {
@@ -257,6 +266,8 @@ export function useCards() {
   // Filter existing cards client-side — no API call, sidebar untouched
   // Always filters from allWebCards (master) so dismiss+filter don't conflict
   const clientRefine = useCallback((chips: ActiveFilterChip[]) => {
+    const filterStart = Date.now()
+    setIsFiltering(true)
     setAllWebCards(master => {
       // Restore dismissed cards before filtering (dismissed have visible:false from dismissCard)
       // We keep a separate dismissed set via the card's original visible flag
@@ -284,6 +295,8 @@ export function useCards() {
       })
 
       setWebCards(filtered)
+      setFilterTime(Date.now() - filterStart)
+      setTimeout(() => setIsFiltering(false), 300) // keep indicator visible briefly
       return master // allWebCards stays unchanged
     })
   }, [])
@@ -299,6 +312,7 @@ export function useCards() {
     fileCards: fileCards.filter(c => c.visible),
     moreCards: moreCards.filter(c => c.visible),
     linkResults, allSelected, sidebarFilters, apiError, currentTopic, hasSearched,
+    isFiltering, searchTime, filterTime, totalCards,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
     isSearching, isAnalyzing,
     search, analyze, addMoreQuestion,
