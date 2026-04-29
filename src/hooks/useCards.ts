@@ -48,6 +48,7 @@ async function callSearchAPI(query: string, searchMode: SearchMode, subMode: str
   cards: SearchCard[]
   links: LinkResult[]
   sidebarFilters: SidebarFilterSection[]
+  topic: string
 }> {
   const res = await fetch('/api/search', {
     method: 'POST',
@@ -141,7 +142,7 @@ export function useCards() {
       setWebCards(result.cards)
       setLinkResults(result.links)
       setSidebarFilters(result.sidebarFilters)
-      setCurrentTopic((result as {topic?:string}).topic || "")
+      setCurrentTopic(result.topic || "")
     } catch (err) {
       setApiError(err instanceof Error ? err.message : String(err))
     } finally {

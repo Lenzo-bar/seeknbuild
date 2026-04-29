@@ -19,13 +19,10 @@ import styles from './App.module.css'
 // Detect category from query text + topic
 function detectCategory(query: string, topic: string): FilterCategory {
   const q = (query + ' ' + topic).toLowerCase()
-  if (/math|calculus|algebra|science|physics|chemistry|biology|history|philosophy|
-       economics|literature|psychology|sociology|engineering|medicine|law|
-       course|lecture|university|grade|school|student|research|academia|
-       study|theorem|proof|equation|hypothesis/.test(q)) return 'academia'
-  if (/buy|sell|price|rent|lease|house|condo|car|truck|shop|store|
-       deal|discount|market|real.?estate|property|listing|vehicle|
-       product|amazon|ebay|cost|fee|rate|mortgage/.test(q)) return 'buying-selling'
+  const academiaRx = /math|calculus|algebra|science|physics|chemistry|biology|history|philosophy|economics|literature|psychology|sociology|engineering|medicine|law|course|lecture|university|grade|school|student|research|academia|study|theorem|proof|equation|hypothesis/
+  const buyRx = /buy|sell|price|rent|lease|house|condo|car|truck|shop|store|deal|discount|market|real estate|property|listing|vehicle|product|amazon|ebay|cost|fee|rate|mortgage/
+  if (academiaRx.test(q)) return 'academia'
+  if (buyRx.test(q)) return 'buying-selling'
   return 'general'
 }
 
