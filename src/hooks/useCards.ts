@@ -108,7 +108,7 @@ async function callSearchAPI(query: string, searchMode: SearchMode, subMode: str
       }))
     : []
 
-  return { cards, links, sidebarFilters }
+  return { cards, links, sidebarFilters, topic: (data.topic as string) || "" }
 }
 
 export function useCards() {
@@ -120,6 +120,7 @@ export function useCards() {
   const [isSearching,    setIsSearching]    = useState(false)
   const [isAnalyzing,    setIsAnalyzing]    = useState(false)
   const [apiError,       setApiError]       = useState<string | null>(null)
+  const [currentTopic,   setCurrentTopic]   = useState<string>("")
 
   const hasWeb   = webCards.length  > 0
   const hasFile  = fileCards.length > 0
@@ -140,6 +141,7 @@ export function useCards() {
       setWebCards(result.cards)
       setLinkResults(result.links)
       setSidebarFilters(result.sidebarFilters)
+      setCurrentTopic((result as {topic?:string}).topic || "")
     } catch (err) {
       setApiError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -251,7 +253,7 @@ export function useCards() {
     webCards:  webCards.filter(c => c.visible),
     fileCards: fileCards.filter(c => c.visible),
     moreCards: moreCards.filter(c => c.visible),
-    linkResults, allSelected, sidebarFilters, apiError,
+    linkResults, allSelected, sidebarFilters, apiError, currentTopic,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
     isSearching, isAnalyzing,
     search, analyze, addMoreQuestion,

@@ -1,4 +1,3 @@
-/* The sidebar fills its sticky container */
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -7,158 +6,78 @@
   border-radius: var(--r-lg);
   overflow: hidden;
   box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-  min-height: 120px;
 }
 
 /* ── Header ── */
 .header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 11px 14px 9px;
+  gap: 6px;
+  padding: 10px 12px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
+.headerTitle { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-3); }
+.categoryBadge { font-size:10px; font-weight:500; color:var(--teal); background:var(--teal-light); padding:2px 7px; border-radius:9px; }
+.resetBtn { margin-left:auto; font-size:11px; color:var(--red,#dc2626); background:none; border:none; cursor:pointer; font-weight:500; padding:0; }
+.resetBtn:hover { text-decoration:underline; }
 
-.headerTitle {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--text-3);
-}
-
-.resetBtn {
-  font-size: 11px;
-  color: var(--teal);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  font-weight: 500;
-}
-.resetBtn:hover { text-decoration: underline; }
-
-/* ── Body ── */
+/* ── Scrollable body ── */
 .body {
   flex: 1;
-  display: flex;
-  flex-direction: column;
   overflow-y: auto;
-}
-
-/* ── Empty / loading state ── */
-.statusArea {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 28px 16px;
-  color: var(--text-3);
-  text-align: center;
-  flex: 1;
 }
+.body::-webkit-scrollbar { width: 3px; }
+.body::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
 
-.emptyIcon   { font-size: 24px; opacity: 0.35; }
-.statusText  { font-size: 12px; color: var(--text-3); line-height: 1.5; }
-
-.spinner {
-  width: 22px; height: 22px;
-  border: 2px solid var(--border);
-  border-top-color: var(--teal);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Filter sections ── */
-.sections { flex: 1; }
-
+/* ── Sections ── */
 .section { border-bottom: 1px solid var(--border); }
-.section:last-child { border-bottom: none; }
+.section:last-of-type { border-bottom: none; }
 
 .sectionHeader {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 9px 14px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-align: left;
+  width: 100%; display:flex; align-items:center; justify-content:space-between;
+  padding: 8px 12px; background:transparent; border:none; cursor:pointer; text-align:left;
   transition: background 0.1s;
 }
 .sectionHeader:hover { background: var(--surface-2); }
 
-.sectionLabel { font-size: 12px; font-weight: 600; color: var(--text-1); }
-
-.chevron { transition: transform 0.15s; color: var(--text-3); }
+.sectionLabel { font-size:12px; font-weight:600; color:var(--text-1); padding: 6px 12px 0; display:block; }
+.chevron { transition:transform 0.15s; color:var(--text-3); }
 .chevronCollapsed { transform: rotate(-90deg); }
 
-.sectionBody {
-  padding: 4px 14px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
+.sectionBody { padding: 4px 12px 10px; display:flex; flex-direction:column; gap:3px; }
 
-/* ── Checkbox / radio items ── */
-.checkItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 4px;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  transition: background 0.1s;
-}
+/* ── Inputs ── */
+.checkItem { display:flex; align-items:center; gap:8px; padding:3px 2px; border-radius:var(--r-sm); cursor:pointer; transition:background 0.1s; }
 .checkItem:hover { background: var(--surface-2); }
-
 .checkbox { width:14px; height:14px; flex-shrink:0; accent-color:var(--navy); cursor:pointer; }
-.checkLabel { font-size: 12px; color: var(--text-2); line-height: 1.3; }
+.checkLabel { font-size:12px; color:var(--text-2); line-height:1.3; }
 
-/* ── Select ── */
-.select {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
-  color: var(--text-1);
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-}
+.select { width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:var(--r-sm); background:var(--surface-2); color:var(--text-1); font-size:12px; font-family:inherit; cursor:pointer; }
 
-/* ── Range ── */
-.rangeRow { display: flex; align-items: center; gap: 6px; }
-.rangeInput {
-  flex: 1; min-width: 0;
-  padding: 5px 6px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
-  color: var(--text-1);
-  font-size: 12px;
-  font-family: inherit;
-}
-.rangeSep { font-size: 12px; color: var(--text-3); flex-shrink: 0; }
+.rangeRow { display:flex; align-items:center; gap:5px; }
+.rangeInput { flex:1; min-width:0; padding:5px 6px; border:1px solid var(--border); border-radius:var(--r-sm); background:var(--surface-2); color:var(--text-1); font-size:12px; font-family:inherit; }
+.rangeSep { font-size:12px; color:var(--text-3); flex-shrink:0; }
 
-/* ── Apply button ── */
-.applyBtn {
-  margin: 10px 12px 12px;
-  padding: 9px 0;
-  background: var(--navy);
-  color: #fff;
-  border: none;
-  border-radius: var(--r-md);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.14s;
-  flex-shrink: 0;
+.applyBtn { margin:10px 12px 12px; padding:8px 0; background:var(--navy); color:#fff; border:none; border-radius:var(--r-md); font-size:13px; font-weight:600; cursor:pointer; transition:opacity 0.14s; }
+.applyBtn:hover { opacity:0.87; }
+
+/* ── Skeleton loading ── */
+.skeleton { padding: 8px 12px; display:flex; flex-direction:column; gap:16px; }
+.skelSection { display:flex; flex-direction:column; gap:8px; }
+.skelRow { display:flex; align-items:center; gap:8px; }
+.skelCheck { width:14px; height:14px; border-radius:3px; background:var(--skel,#e5e7eb); flex-shrink:0; animation: shimmer 1.4s ease-in-out infinite; }
+.skelLine { height:10px; border-radius:4px; background:var(--skel,#e5e7eb); animation: shimmer 1.4s ease-in-out infinite; }
+.skelTitle { width:60%; height:11px; margin-bottom:2px; }
+.skelLabel { flex:1; }
+.skelDropdown { height:32px; border-radius:var(--r-sm); background:var(--skel,#e5e7eb); animation: shimmer 1.4s ease-in-out infinite; }
+
+@keyframes shimmer {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.45; }
+  100% { opacity: 1; }
 }
-.applyBtn:hover { opacity: 0.87; }

@@ -1,26 +1,55 @@
-import { useState, useEffect } from 'react'
-import { PromptBox }         from './components/PromptBox'
-import { SearchModeBar }     from './components/SearchModeBar'
-import { SidebarFilters }    from './components/SidebarFilters'
-import { DocBar }            from './components/DocBar'
-import { Toolbar }           from './components/Toolbar'
-import { CardGrid }          from './components/CardGrid'
-import { ExpandOverlay }     from './components/ExpandOverlay'
-import { DocumentModal }     from './components/DocumentModal'
-import { MoreQuestionPanel } from './components/MoreQuestionPanel'
-import { ZoneLabel }         from './components/ZoneLabel'
-import { LinkZone }          from './components/LinkZone'
-import { useCards }          from './hooks/useCards'
-import type { CardZone, ThemeName, SearchMode } from './types'
+import { useState, useEffect, useCallback } from 'react'
+import { PromptBox }          from './components/PromptBox'
+import { SearchModeBar }      from './components/SearchModeBar'
+import { SidebarFilters }     from './components/SidebarFilters'
+import { ActiveFilterChips }  from './components/ActiveFilterChips'
+import { DocBar }             from './components/DocBar'
+import { Toolbar }            from './components/Toolbar'
+import { CardGrid }           from './components/CardGrid'
+import { ExpandOverlay }      from './components/ExpandOverlay'
+import { DocumentModal }      from './components/DocumentModal'
+import { MoreQuestionPanel }  from './components/MoreQuestionPanel'
+import { ZoneLabel }          from './components/ZoneLabel'
+import { LinkZone }           from './components/LinkZone'
+import { useCards }           from './hooks/useCards'
+import { getFilterCategory }  from './data/filterCategories'
+import type { CardZone, ThemeName, SearchMode, ActiveFilterChip, FilterCategory } from './types'
 import styles from './App.module.css'
+
+// Detect category from query text + topic
+function detectCategory(query: string, topic: string): FilterCategory {
+  const q = (query + ' ' + topic).toLowerCase()
+  if (/math|calculus|algebra|science|physics|chemistry|biology|history|philosophy|
+       economics|literature|psychology|sociology|engineering|medicine|law|
+       course|lecture|university|grade|school|student|research|academia|
+       study|theorem|proof|equation|hypothesis/.test(q)) return 'academia'
+  if (/buy|sell|price|rent|lease|house|condo|car|truck|shop|store|
+       deal|discount|market|real.?estate|property|listing|vehicle|
+       product|amazon|ebay|cost|fee|rate|mortgage/.test(q)) return 'buying-selling'
+  return 'general'
+}
+
+// Smart mode fusion: merge explicit mode tab + prompt intent
+function fuseSearchMode(explicitMode: SearchMode, query: string): { mode: SearchMode; hint: string } {
+  const q = query.toLowerCase()
+  // Prompt overrides tab if it's more specific
+  if (explicitMode !== 'all') return { mode: explicitMode, hint: '' }
+  if (/\bvideo(s)?\b|\bwatch\b|\byoutube\b|\bclip\b/.test(q))       return { mode: 'videos',   hint: 'video' }
+  if (/\bnews\b|\bheadline\b|\barticle\b|\bbreaking\b/.test(q))     return { mode: 'news',     hint: 'news' }
+  if (/\bimage(s)?\b|\bphoto(s)?\b|\bpicture(s)?\b/.test(q))       return { mode: 'images',   hint: 'image' }
+  if (/\bforum\b|\breddit\b|\bdiscussion\b|\bthread\b/.test(q))     return { mode: 'forums',   hint: 'forum' }
+  if (/\bbuy\b|\bshop\b|\bprice\b|\bpurchase\b|\bproduct\b/.test(q))return { mode: 'shopping', hint: 'shopping' }
+  if (/\bsport\b|\bscore\b|\bnba\b|\bnfl\b|\bnhl\b|\bmlb\b/.test(q))return { mode: 'sports',  hint: 'sports' }
+  return { mode: 'all', hint: '' }
+}
 
 export default function App() {
   const {
     webCards, fileCards, moreCards, linkResults, allSelected, sidebarFilters, apiError,
     hasWeb, hasFile, hasMore, hasLinks, hasAny,
-    isAnalyzing, isSearching,
+    isAnalyzing, isSearching, currentTopic,
     search, analyze, addMoreQuestion,
-    refine, clearWeb, clearFile, reset,
+    clearWeb, clearFile, reset,
     dismissCard, toggleDocSelect, clearDocSelections, reorderCards,
     convertLinksToCards,
   } = useCards()
@@ -33,25 +62,41 @@ export default function App() {
   const [theme,        setTheme]        = useState<ThemeName>('light')
   const [searchMode,   setSearchMode]   = useState<SearchMode>('all')
   const [subMode,      setSubMode]      = useState('')
+  const [activeChips,  setActiveChips]  = useState<ActiveFilterChip[]>([])
+  const [filterCat,    setFilterCat]    = useState<FilterCategory>('general')
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-  }, [theme])
-
-  function handleExpand(id: string, zone: CardZone) {
-    setExpandedId(prev => prev === id ? null : id)
-    setExpandedZone(zone)
-  }
+  useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme])
 
   function handleModeChange(mode: SearchMode, sub = '') {
-    setSearchMode(mode)
-    setSubMode(sub)
+    setSearchMode(mode); setSubMode(sub)
+  }
+
+  function handleSearch(query: string) {
+    const { mode } = fuseSearchMode(searchMode, query)
+    const cat = detectCategory(query, '')
+    setFilterCat(cat)
+    setActiveChips([])
+    search(query, mode, subMode)
+    setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
+  }
+
+  // Update category when topic arrives from API
+  useEffect(() => {
+    if (currentTopic) setFilterCat(getFilterCategory(currentTopic))
+  }, [currentTopic])
+
+  const handleRefine = useCallback((chips: ActiveFilterChip[]) => {
+    setActiveChips(chips)
+    // Future: filter webCards by chips
+  }, [])
+
+  function removeChip(id: string) {
+    setActiveChips(prev => prev.filter(c => c.id !== id))
   }
 
   const expandedCard = expandedId
     ? [...webCards, ...fileCards, ...moreCards].find(c => c.id === expandedId) ?? null
     : null
-
   const allVisible = [...webCards, ...fileCards, ...moreCards]
 
   return (
@@ -67,10 +112,9 @@ export default function App() {
         <div className={styles.themeSwitcher}>
           <span className={styles.themeLabel}>Theme</span>
           {(['light','dark','blue'] as ThemeName[]).map(t => (
-            <button key={t}
-              className={`${styles.themeBtn} ${theme === t ? styles.themeBtnOn : ''}`}
+            <button key={t} className={`${styles.themeBtn} ${theme===t ? styles.themeBtnOn:''}`}
               onClick={() => setTheme(t)} title={t}>
-              {t === 'light' ? '☀' : t === 'dark' ? '🌙' : '🔷'}
+              {t==='light'?'☀':t==='dark'?'🌙':'🔷'}
             </button>
           ))}
         </div>
@@ -79,38 +123,40 @@ export default function App() {
       {/* ── Two-column layout ── */}
       <div className={styles.layout}>
 
-        {/* LEFT: Sidebar — always rendered */}
+        {/* LEFT sidebar */}
         <aside className={styles.sidebarCol}>
           <SidebarFilters
+            category={filterCat}
+            topic={currentTopic || ''}
             sections={sidebarFilters}
             isSearching={isSearching}
-            onRefine={vals => {
-              refine({ checkboxes: vals as Record<string,boolean>, learnerLevel: 'All levels', extraFilter: '' })
-            }}
+            onRefine={handleRefine}
           />
         </aside>
 
-        {/* RIGHT: Main content */}
+        {/* RIGHT main */}
         <main className={styles.mainCol}>
 
           <PromptBox
-            hasAny={hasAny} hasWeb={hasWeb || hasLinks} hasFile={hasFile}
+            hasAny={hasAny} hasWeb={hasWeb||hasLinks} hasFile={hasFile}
             isAnalyzing={isAnalyzing} isSearching={isSearching}
             searchMode={searchMode} subMode={subMode}
-            onSearch={(q, mode, sub) => {
-              search(q, mode, sub)
-              setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
-            }}
+            onSearch={(q, _mode, _sub) => handleSearch(q)}
             onAnalyze={f => { analyze(f); setExpandedId(null) }}
             onMoreQuestion={() => setShowMoreQ(v => !v)}
             onClearWeb={clearWeb} onClearFile={clearFile}
-            onReset={() => { reset(); setExpandedId(null); setShowDoc(false); setShowMoreQ(false) }}
+            onReset={() => { reset(); setActiveChips([]); setExpandedId(null); setShowDoc(false); setShowMoreQ(false) }}
           />
 
-          {/* Search mode tabs */}
           <SearchModeBar active={searchMode} subMode={subMode} onChange={handleModeChange} />
 
-          {/* API Error banner */}
+          {/* Active filter chips below prompt */}
+          <ActiveFilterChips
+            chips={activeChips}
+            onRemove={removeChip}
+            onClearAll={() => setActiveChips([])}
+          />
+
           {apiError && (
             <div className={styles.errorBanner}>
               <strong>⚠ Search error:</strong> {apiError}
@@ -128,27 +174,22 @@ export default function App() {
             <DocBar count={allSelected.length} onBuild={() => setShowDoc(true)} onClear={clearDocSelections} />
           )}
 
-          {hasAny && (
-            <Toolbar visible={allVisible.length} cols={cols} onColsChange={setCols} />
-          )}
+          {hasAny && <Toolbar visible={allVisible.length} cols={cols} onColsChange={setCols} />}
 
           {expandedCard && (
             <ExpandOverlay card={expandedCard} onClose={() => setExpandedId(null)}
               onToggleDoc={() => expandedZone && toggleDocSelect(expandedCard.id, expandedZone)} />
           )}
-
-          {showDoc && (
-            <DocumentModal cards={allSelected} onClose={() => setShowDoc(false)} />
-          )}
+          {showDoc && <DocumentModal cards={allSelected} onClose={() => setShowDoc(false)} />}
 
           {hasWeb && (
             <div className={styles.zone}>
               <ZoneLabel color="web" label="Web + LLM results" count={webCards.length} />
               <CardGrid cards={webCards} zone="web" cols={cols} expandedId={expandedId}
                 onReorder={reorderCards}
-                onExpand={id => handleExpand(id, 'web')}
-                onDismiss={id => dismissCard(id, 'web')}
-                onToggleDoc={id => toggleDocSelect(id, 'web')} />
+                onExpand={id => { setExpandedId(p => p===id?null:id); setExpandedZone('web') }}
+                onDismiss={id => dismissCard(id,'web')}
+                onToggleDoc={id => toggleDocSelect(id,'web')} />
             </div>
           )}
 
@@ -157,17 +198,15 @@ export default function App() {
           {hasFile && (
             <>
               <div className={styles.zoneSep}>
-                <div className={styles.zoneSepLine} />
-                <span className={styles.zoneSepText}>file analysis cards</span>
-                <div className={styles.zoneSepLine} />
+                <div className={styles.zoneSepLine}/><span className={styles.zoneSepText}>file analysis</span><div className={styles.zoneSepLine}/>
               </div>
               <div className={styles.zone}>
                 <ZoneLabel color="file" label="From file analysis" count={fileCards.length} />
                 <CardGrid cards={fileCards} zone="file" cols={cols} expandedId={expandedId}
                   onReorder={reorderCards}
-                  onExpand={id => handleExpand(id, 'file')}
-                  onDismiss={id => dismissCard(id, 'file')}
-                  onToggleDoc={id => toggleDocSelect(id, 'file')} />
+                  onExpand={id => { setExpandedId(p=>p===id?null:id); setExpandedZone('file') }}
+                  onDismiss={id => dismissCard(id,'file')}
+                  onToggleDoc={id => toggleDocSelect(id,'file')} />
               </div>
             </>
           )}
@@ -175,17 +214,15 @@ export default function App() {
           {hasMore && (
             <>
               <div className={styles.zoneSep}>
-                <div className={styles.zoneSepLine} />
-                <span className={styles.zoneSepText}>additional question cards</span>
-                <div className={styles.zoneSepLine} />
+                <div className={styles.zoneSepLine}/><span className={styles.zoneSepText}>additional question</span><div className={styles.zoneSepLine}/>
               </div>
               <div className={styles.zone}>
                 <ZoneLabel color="more" label="Additional question" count={moreCards.length} />
                 <CardGrid cards={moreCards} zone="more" cols={cols} expandedId={expandedId}
                   onReorder={reorderCards}
-                  onExpand={id => handleExpand(id, 'more')}
-                  onDismiss={id => dismissCard(id, 'more')}
-                  onToggleDoc={id => toggleDocSelect(id, 'more')} />
+                  onExpand={id => { setExpandedId(p=>p===id?null:id); setExpandedZone('more') }}
+                  onDismiss={id => dismissCard(id,'more')}
+                  onToggleDoc={id => toggleDocSelect(id,'more')} />
               </div>
             </>
           )}
@@ -194,7 +231,7 @@ export default function App() {
             <div className={styles.welcome}>
               <div className={styles.welcomeIcon}>⟳</div>
               <p>Enter a query and click <strong>Search</strong> to see live results as interactive cards.</p>
-              <p className={styles.welcomeHint}>Use the mode tabs to filter by News, Images, Videos, and more. Filters appear on the left after you search.</p>
+              <p className={styles.welcomeHint}>Filters on the left adapt to your search — buying/selling, academia, or general topics.</p>
             </div>
           )}
 
