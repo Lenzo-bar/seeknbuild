@@ -8,15 +8,19 @@ import {
 } from '../data/filterCategories'
 import styles from './SidebarFilters.module.css'
 
+// Section IDs that are location-related (only these reset on location change)
+const LOCATION_SECTION_IDS = new Set(['region', 'city', 'location', 'area', 'zone', 'neighborhood', 'district'])
+
 interface Props {
-  category:      FilterCategory
-  topic:         string
-  sections:      SidebarFilterSection[]
-  isSearching:   boolean
-  resetKey:      number
-  removedChipId: string | null
-  onRefine:      (chips: ActiveFilterChip[]) => void   // preview only — no card filtering
-  onApply:       (chips: ActiveFilterChip[]) => void   // actually filters cards
+  category:           FilterCategory
+  topic:              string
+  sections:           SidebarFilterSection[]
+  isSearching:        boolean
+  resetKey:           number   // full reset — wipes everything
+  locationRefreshKey: number   // partial reset — only location sections
+  removedChipId:      string | null
+  onRefine:           (chips: ActiveFilterChip[]) => void
+  onApply:            (chips: ActiveFilterChip[]) => void
 }
 
 // ── Skeleton loaders ──────────────────────────────────────────────
@@ -46,7 +50,7 @@ function SkeletonAcademia() {
         {Array.from({length:10}).map((_,i) => (
           <div key={i} className={styles.skelRow}>
             <div className={styles.skelCheck} />
-            <div className={`${styles.skelLine} ${styles.skelLabel}`} style={{width: `${55+Math.random()*35}%`}} />
+            <div className={`${styles.skelLine} ${styles.skelLabel}`} style={{width:`${55+Math.random()*35}%`}} />
           </div>
         ))}
       </div>
@@ -62,12 +66,9 @@ function SkeletonAcademia() {
   )
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
+// ── Academia helpers ──────────────────────────────────────────────
 function buildAcademiaChips(
-  checks: Record<string,boolean>,
-  level: string,
-  secA: string,
-  secB: string
+  checks: Record<string,boolean>, level: string, secA: string, secB: string
 ): ActiveFilterChip[] {
   const chips: ActiveFilterChip[] = []
   Object.entries(checks).forEach(([label, on]) => {
@@ -96,10 +97,8 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
   const [secA,   setSecA]   = useState('')
   const [secB,   setSecB]   = useState('')
 
-  // Reset when topic changes
   useEffect(() => { setChecks({}); setLevel(''); setSecA(''); setSecB('') }, [topic])
 
-  // Sync when chip is individually removed
   useEffect(() => {
     if (!removedChipId) return
     if (removedChipId === 'level') { setLevel(''); return }
@@ -111,38 +110,27 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
     }
   }, [removedChipId])
 
-  // Notify parent of chip preview whenever values change
   useEffect(() => {
     onChipsChange(buildAcademiaChips(checks, level, secA, secB))
   }, [checks, level, secA, secB, onChipsChange])
-
-  function toggleCheck(label: string) {
-    setChecks(prev => ({ ...prev, [label]: !prev[label] }))
-  }
-
-  function handleApply() {
-    onApply(buildAcademiaChips(checks, level, secA, secB))
-  }
 
   const hasPending = Object.values(checks).some(Boolean) || !!level || !!secA || !!secB
 
   return (
     <div className={styles.body}>
-      {/* Primary checkboxes */}
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Primary filters</div>
         <div className={styles.sectionBody}>
           {primaries.map(p => (
             <label key={p} className={styles.checkItem}>
               <input type="checkbox" className={styles.checkbox}
-                checked={!!checks[p]} onChange={() => toggleCheck(p)} />
+                checked={!!checks[p]} onChange={() => setChecks(prev => ({ ...prev, [p]: !prev[p] }))} />
               <span className={styles.checkLabel}>{p}</span>
             </label>
           ))}
         </div>
       </div>
 
-      {/* Level */}
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Learner level</div>
         <div className={styles.sectionBody}>
@@ -153,7 +141,6 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
         </div>
       </div>
 
-      {/* Sub-topic */}
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Sub-topic</div>
         <div className={styles.sectionBody}>
@@ -164,7 +151,6 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
         </div>
       </div>
 
-      {/* Format */}
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Format / type</div>
         <div className={styles.sectionBody}>
@@ -177,7 +163,7 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
 
       <button
         className={`${styles.applyBtn} ${hasPending ? '' : styles.applyBtnDim}`}
-        onClick={handleApply}
+        onClick={() => onApply(buildAcademiaChips(checks, level, secA, secB))}
       >
         {hasPending ? '✓ Apply filters' : 'Apply filters'}
       </button>
@@ -186,19 +172,36 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
 }
 
 // ── Buying/Selling panel ──────────────────────────────────────────
-function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onApply }: {
-  topic: string
-  sections: SidebarFilterSection[]
-  removedChipId: string | null
-  onChipsChange: (chips: ActiveFilterChip[]) => void
-  onApply: (chips: ActiveFilterChip[]) => void
+function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onApply, locationRefreshKey }: {
+  topic:              string
+  sections:           SidebarFilterSection[]
+  removedChipId:      string | null
+  locationRefreshKey: number
+  onChipsChange:      (chips: ActiveFilterChip[]) => void
+  onApply:            (chips: ActiveFilterChip[]) => void
 }) {
   const topicKey = Object.keys(BUYING_SELLING_FILTERS).find(k => topic.includes(k)) || 'general'
   const displaySections = sections.length > 0 ? sections : BUYING_SELLING_FILTERS[topicKey] || BUYING_SELLING_FILTERS.general
   const [values,    setValues]    = useState<Record<string, unknown>>({})
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
+  // Full reset when topic changes
   useEffect(() => { setValues({}) }, [topic])
+
+  // Partial reset: only clear location-related section values when location changes
+  useEffect(() => {
+    if (locationRefreshKey === 0) return
+    setValues(prev => {
+      const next = { ...prev }
+      displaySections.forEach(sec => {
+        if (LOCATION_SECTION_IDS.has(sec.id)) {
+          delete next[sec.id]
+        }
+      })
+      return next
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationRefreshKey])
 
   // Sync when chip is individually removed
   useEffect(() => {
@@ -222,7 +225,6 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
     })
   }, [removedChipId])
 
-  // Build chips from current values
   function buildChips(): ActiveFilterChip[] {
     const chips: ActiveFilterChip[] = []
     displaySections.forEach(sec => {
@@ -237,7 +239,7 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
       } else if (sec.type === 'range') {
         const r = v as { min?: string; max?: string }
         if (r.min || r.max) {
-          const val = [r.min && `${sec.unit || ''}${r.min}`, r.max && `${sec.unit || ''}${r.max}`].filter(Boolean).join(' – ')
+          const val = [r.min && `${sec.unit||''}${r.min}`, r.max && `${sec.unit||''}${r.max}`].filter(Boolean).join(' – ')
           chips.push({ id: sec.id, label: sec.label, value: val, category: 'buying-selling' })
         }
       }
@@ -245,7 +247,6 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
     return chips
   }
 
-  // Notify parent of chip preview whenever values change
   useEffect(() => {
     onChipsChange(buildChips())
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -264,59 +265,66 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
 
   return (
     <div className={styles.body}>
-      {displaySections.map(sec => (
-        <div key={sec.id} className={styles.section}>
-          <button className={styles.sectionHeader}
-            onClick={() => setCollapsed(p => ({ ...p, [sec.id]: !p[sec.id] }))}>
-            <span className={styles.sectionLabel}>{sec.label}</span>
-            <svg className={`${styles.chevron} ${collapsed[sec.id] ? styles.chevronCollapsed : ''}`}
-              width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M3 4.5L6 7.5L9 4.5"/>
-            </svg>
-          </button>
+      {displaySections.map(sec => {
+        const isLocationSec = LOCATION_SECTION_IDS.has(sec.id)
+        return (
+          <div key={sec.id} className={styles.section}>
+            <button className={styles.sectionHeader}
+              onClick={() => setCollapsed(p => ({ ...p, [sec.id]: !p[sec.id] }))}>
+              <span className={styles.sectionLabel}>
+                {sec.label}
+                {/* Small indicator on location sections so user can see they're location-aware */}
+                {isLocationSec && <span style={{ marginLeft: 5, fontSize: 10, color: 'var(--teal)', fontWeight: 500 }}>📍</span>}
+              </span>
+              <svg className={`${styles.chevron} ${collapsed[sec.id] ? styles.chevronCollapsed : ''}`}
+                width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M3 4.5L6 7.5L9 4.5"/>
+              </svg>
+            </button>
 
-          {!collapsed[sec.id] && (
-            <div className={styles.sectionBody}>
-              {sec.type === 'checkboxes' && sec.options?.map(opt => (
-                <label key={opt} className={styles.checkItem}>
-                  <input type="checkbox" className={styles.checkbox}
-                    checked={!!((values[sec.id] as Record<string,boolean>)?.[opt])}
-                    onChange={e => setCheck(sec.id, opt, e.target.checked)} />
-                  <span className={styles.checkLabel}>{opt}</span>
-                </label>
-              ))}
-              {sec.type === 'radio' && sec.options?.map(opt => (
-                <label key={opt} className={styles.checkItem}>
-                  <input type="radio" name={sec.id} className={styles.checkbox}
-                    checked={values[sec.id] === opt}
-                    onChange={() => setRadio(sec.id, opt)} />
-                  <span className={styles.checkLabel}>{opt}</span>
-                </label>
-              ))}
-              {sec.type === 'select' && (
-                <select className={styles.select} value={(values[sec.id] as string) || ''}
-                  onChange={e => setSelect(sec.id, e.target.value)}>
-                  <option value="">Any</option>
-                  {sec.options?.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              )}
-              {sec.type === 'range' && (
-                <div className={styles.rangeRow}>
-                  <input type="number" className={styles.rangeInput}
-                    placeholder={`Min${sec.unit ? ` (${sec.unit})` : ''}`}
-                    value={((values[sec.id] as {min?:string})?.min) || ''}
-                    onChange={e => setRange(sec.id, 'min', e.target.value)} />
-                  <span className={styles.rangeSep}>–</span>
-                  <input type="number" className={styles.rangeInput}
-                    placeholder={`Max${sec.unit ? ` (${sec.unit})` : ''}`}
-                    value={((values[sec.id] as {max?:string})?.max) || ''}
-                    onChange={e => setRange(sec.id, 'max', e.target.value)} />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+            {!collapsed[sec.id] && (
+              <div className={styles.sectionBody}>
+                {sec.type === 'checkboxes' && sec.options?.map(opt => (
+                  <label key={opt} className={styles.checkItem}>
+                    <input type="checkbox" className={styles.checkbox}
+                      checked={!!((values[sec.id] as Record<string,boolean>)?.[opt])}
+                      onChange={e => setCheck(sec.id, opt, e.target.checked)} />
+                    <span className={styles.checkLabel}>{opt}</span>
+                  </label>
+                ))}
+                {sec.type === 'radio' && sec.options?.map(opt => (
+                  <label key={opt} className={styles.checkItem}>
+                    <input type="radio" name={sec.id} className={styles.checkbox}
+                      checked={values[sec.id] === opt}
+                      onChange={() => setRadio(sec.id, opt)} />
+                    <span className={styles.checkLabel}>{opt}</span>
+                  </label>
+                ))}
+                {sec.type === 'select' && (
+                  <select className={styles.select} value={(values[sec.id] as string) || ''}
+                    onChange={e => setSelect(sec.id, e.target.value)}>
+                    <option value="">Any</option>
+                    {sec.options?.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                )}
+                {sec.type === 'range' && (
+                  <div className={styles.rangeRow}>
+                    <input type="number" className={styles.rangeInput}
+                      placeholder={`Min${sec.unit ? ` (${sec.unit})` : ''}`}
+                      value={((values[sec.id] as {min?:string})?.min) || ''}
+                      onChange={e => setRange(sec.id, 'min', e.target.value)} />
+                    <span className={styles.rangeSep}>–</span>
+                    <input type="number" className={styles.rangeInput}
+                      placeholder={`Max${sec.unit ? ` (${sec.unit})` : ''}`}
+                      value={((values[sec.id] as {max?:string})?.max) || ''}
+                      onChange={e => setRange(sec.id, 'max', e.target.value)} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
 
       <button
         className={`${styles.applyBtn} ${hasPending ? '' : styles.applyBtnDim}`}
@@ -331,7 +339,7 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
 // ── Main export ───────────────────────────────────────────────────
 export function SidebarFilters({
   category, topic, sections, isSearching,
-  resetKey, removedChipId, onRefine, onApply
+  resetKey, locationRefreshKey, removedChipId, onRefine, onApply
 }: Props) {
   const [chips, setChips] = useState<ActiveFilterChip[]>([])
 
@@ -339,7 +347,7 @@ export function SidebarFilters({
 
   function handleChips(incoming: ActiveFilterChip[]) {
     setChips(incoming)
-    onRefine(incoming)   // preview only — parent updates chip display but NOT cards
+    onRefine(incoming)
   }
 
   const hasAny = chips.length > 0
@@ -372,6 +380,7 @@ export function SidebarFilters({
           topic={topic}
           sections={sections}
           removedChipId={removedChipId}
+          locationRefreshKey={locationRefreshKey}
           onChipsChange={handleChips}
           onApply={onApply}
         />

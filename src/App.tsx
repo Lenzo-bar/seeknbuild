@@ -37,6 +37,21 @@ function fuseSearchMode(explicitMode: SearchMode, query: string): { mode: Search
   return { mode: 'all', hint: '' }
 }
 
+// Extract location tokens from a query string
+function extractLocations(q: string): string[] {
+  // Common location prepositions signal what follows is a place name
+  const matches = q.toLowerCase().match(/(?:in|near|around|region of|area of)\s+([a-z\s]+?)(?:\s+and|\s+or|,|$)/g) || []
+  return matches.map(m => m.replace(/^(in|near|around|region of|area of)\s+/, '').trim()).filter(Boolean)
+}
+
+// Detect if two location sets differ meaningfully (i.e. new location added/changed)
+function locationChanged(oldQuery: string, newQuery: string): boolean {
+  const oldLocs = extractLocations(oldQuery)
+  const newLocs  = extractLocations(newQuery)
+  // If new query has locations not in old query, signal a location change
+  return newLocs.some(loc => !oldLocs.some(old => old.includes(loc) || loc.includes(old)))
+}
+
 export default function App() {
   const {
     webCards, fileCards, moreCards, linkResults, allSelected, sidebarFilters, apiError,
@@ -59,16 +74,17 @@ export default function App() {
   const [subMode,      setSubMode]      = useState('')
   const [activeChips,  setActiveChips]  = useState<ActiveFilterChip[]>([])
   const [filterCat,    setFilterCat]    = useState<FilterCategory>('general')
-  const [filterResetKey,  setFilterResetKey]  = useState(0)
-  const [removedChipId,   setRemovedChipId]   = useState<string | null>(null)
+  const [filterResetKey,    setFilterResetKey]    = useState(0)
+  const [locationRefreshKey, setLocationRefreshKey] = useState(0)  // bumped when only location section should refresh
+  const [removedChipId,     setRemovedChipId]     = useState<string | null>(null)
 
   // Topic-persistence dialog
   const [showTopicDialog, setShowTopicDialog] = useState(false)
   const [lockedTopic,     setLockedTopic]     = useState<string>('')
-  // Prevent the dialog from firing multiple times per editing session
-  const dialogShownRef    = useRef(false)
-  // If user was mid-search when dialog appeared, store it here
-  const pendingSearchRef  = useRef<{ query: string; mode: SearchMode; sub: string } | null>(null)
+
+  // dialogAnsweredYes = user said "Yes, keep filters" this session.
+  // Stays true until a full reset or new search. Prevents re-triggering the dialog.
+  const dialogAnsweredYes = useRef(false)
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme])
 
@@ -76,82 +92,88 @@ export default function App() {
     setSearchMode(mode); setSubMode(sub)
   }
 
-  // ── Execute a fresh search (wipes filters) ────────────────────────
+  // ── Execute a completely fresh search (wipes all filters) ─────────
   function executeSearch(query: string, mode: SearchMode, sub: string) {
     const cat = detectCategory(query, '')
     setFilterCat(cat)
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setLockedTopic(query)
-    dialogShownRef.current = false
-    pendingSearchRef.current = null
+    dialogAnsweredYes.current = false
     search(query, mode, sub)
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
 
-  // ── Search button handler ─────────────────────────────────────────
-  // If filters are active, ask the user first; otherwise search directly.
+  // ── Search button pressed ─────────────────────────────────────────
+  // Rules:
+  // • No prior search, or no active filters → search immediately
+  // • User already said "Yes" this session → search immediately (same context, keep filters)
+  // • Active filters + no answer yet → show dialog first
   function handleSearch(query: string) {
     const { mode } = fuseSearchMode(searchMode, query)
-    if (hasSearched && activeChips.length > 0) {
-      pendingSearchRef.current = { query, mode, sub: subMode }
-      setShowTopicDialog(true)
+
+    if (!hasSearched || activeChips.length === 0 || dialogAnsweredYes.current) {
+      // If location changed and user had said Yes, only refresh location section of sidebar
+      if (dialogAnsweredYes.current && lockedTopic && locationChanged(lockedTopic, query)) {
+        setLocationRefreshKey(k => k + 1)
+      }
+      // Same context confirmed — run search but preserve filters
+      if (dialogAnsweredYes.current) {
+        setLockedTopic(query)
+        search(query, mode, subMode)
+        setExpandedId(null)
+      } else {
+        executeSearch(query, mode, subMode)
+      }
     } else {
-      executeSearch(query, mode, subMode)
+      // Active filters present and user hasn't answered yet — ask first
+      setShowTopicDialog(true)
     }
   }
 
   // ── Prompt edit handler ───────────────────────────────────────────
-  // Show dialog once per edit session when filters are active and user changes the prompt.
+  // Show dialog ONCE per session: only if filters active, user hasn't answered, dialog not open.
   function handlePromptChange(q: string) {
     if (
       hasSearched &&
       activeChips.length > 0 &&
       !showTopicDialog &&
-      !dialogShownRef.current &&
+      !dialogAnsweredYes.current &&
       q.trim().length > 0 &&
       q !== lockedTopic
     ) {
-      dialogShownRef.current = true
       setShowTopicDialog(true)
     }
   }
 
-  // ── Dialog: Yes — keep filters, no action ────────────────────────
+  // ── Dialog: Yes ───────────────────────────────────────────────────
+  // Mark session as confirmed. Dialog will NOT re-appear for the rest of this editing session.
   function handleDialogYes() {
     setShowTopicDialog(false)
-    pendingSearchRef.current = null
-    // Allow dialog to re-appear if user edits again significantly
-    dialogShownRef.current = false
+    dialogAnsweredYes.current = true   // ← key fix: stays true, dialog won't reopen
   }
 
-  // ── Dialog: No — reset everything, run pending search if any ─────
+  // ── Dialog: No ───────────────────────────────────────────────────
   function handleDialogNo() {
     setShowTopicDialog(false)
+    dialogAnsweredYes.current = false
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setFilterCat('general')
     setLockedTopic('')
-    dialogShownRef.current = false
-    clientRefine([]) // restore all cards
-
-    const pending = pendingSearchRef.current
-    pendingSearchRef.current = null
-    if (pending) {
-      executeSearch(pending.query, pending.mode, pending.sub)
-    }
+    clientRefine([])
   }
 
   useEffect(() => {
     if (currentTopic) setFilterCat(getFilterCategory(currentTopic))
   }, [currentTopic])
 
-  // Called when sidebar values change — updates chip preview only, no card filtering
+  // Sidebar value changes → chip preview only, no card filtering
   const handleRefine = useCallback((chips: ActiveFilterChip[]) => {
     setActiveChips(chips)
   }, [])
 
-  // Called when "Apply filters" is pressed — actually filters the cards
+  // "Apply filters" pressed → actually filter cards
   const handleApply = useCallback((chips: ActiveFilterChip[]) => {
     setActiveChips(chips)
     clientRefine(chips)
@@ -176,8 +198,7 @@ export default function App() {
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setLockedTopic('')
-    dialogShownRef.current = false
-    pendingSearchRef.current = null
+    dialogAnsweredYes.current = false
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
 
@@ -255,26 +276,20 @@ export default function App() {
             </p>
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-              <button
-                onClick={handleDialogYes}
-                style={{
-                  padding: '9px 22px', borderRadius: 'var(--r-md)',
-                  border: '1px solid var(--border-mid)',
-                  background: 'var(--surface-2)', color: 'var(--text-1)',
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                }}
-              >
+              <button onClick={handleDialogYes} style={{
+                padding: '9px 22px', borderRadius: 'var(--r-md)',
+                border: '1px solid var(--border-mid)',
+                background: 'var(--surface-2)', color: 'var(--text-1)',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}>
                 Yes, keep filters
               </button>
-              <button
-                onClick={handleDialogNo}
-                style={{
-                  padding: '9px 22px', borderRadius: 'var(--r-md)',
-                  border: 'none',
-                  background: 'var(--navy)', color: '#fff',
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                }}
-              >
+              <button onClick={handleDialogNo} style={{
+                padding: '9px 22px', borderRadius: 'var(--r-md)',
+                border: 'none',
+                background: 'var(--navy)', color: '#fff',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}>
                 No, reset filters
               </button>
             </div>
@@ -293,6 +308,7 @@ export default function App() {
             sections={sidebarFilters}
             isSearching={isSearching}
             resetKey={filterResetKey}
+            locationRefreshKey={locationRefreshKey}
             removedChipId={removedChipId}
             onRefine={handleRefine}
             onApply={handleApply}
