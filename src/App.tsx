@@ -6,7 +6,7 @@ import { ActiveFilterChips }  from './components/ActiveFilterChips'
 import { DocBar }             from './components/DocBar'
 import { Toolbar }            from './components/Toolbar'
 import { CardGrid }           from './components/CardGrid'
-import { ExpandOverlay }      from './components/ExpandOverlay'
+import { CardExpandOverlay }  from './components/CardExpandOverlay'
 import { DocumentModal }      from './components/DocumentModal'
 import { MoreQuestionPanel }  from './components/MoreQuestionPanel'
 import { ZoneLabel }          from './components/ZoneLabel'
@@ -375,7 +375,7 @@ export default function App() {
           )}
 
           {expandedCard && (
-            <ExpandOverlay card={expandedCard} onClose={() => setExpandedId(null)}
+            <CardExpandOverlay card={expandedCard} onClose={() => setExpandedId(null)}
               onToggleDoc={() => expandedZone && toggleDocSelect(expandedCard.id, expandedZone)} />
           )}
           {showDoc && <DocumentModal cards={allSelected} onClose={() => setShowDoc(false)} />}
