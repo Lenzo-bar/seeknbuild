@@ -3,46 +3,56 @@ import type { AppMode, SearchMode } from '../types'
 import styles from './PromptBox.module.css'
 
 interface Props {
-  hasAny:      boolean
-  hasWeb:      boolean
-  hasFile:     boolean
-  isAnalyzing: boolean
-  isSearching: boolean
-  hasSearched: boolean
-  searchMode:  SearchMode
-  subMode:     string
-  onSearch:       (query: string, mode: SearchMode, sub: string) => void
-  onPromptChange?: (query: string) => void
-  onAnalyze:      (file: File) => void
-  onMoreQuestion: () => void
-  onClearWeb:     () => void
-  onClearFile:    () => void
-  onReset:        () => void
+  hasAny:           boolean
+  hasWeb:           boolean
+  hasFile:          boolean
+  isAnalyzing:      boolean
+  isSearching:      boolean
+  hasSearched:      boolean
+  hasActiveFilters: boolean   // ← NEW: true when refinement filters are applied
+  searchMode:       SearchMode
+  subMode:          string
+  onSearch:         (query: string, mode: SearchMode, sub: string) => void
+  onPromptChange?:  (query: string) => void
+  onAnalyze:        (file: File) => void
+  onMoreQuestion:   () => void
+  onClearWeb:       () => void
+  onClearFile:      () => void
+  onReset:          () => void
 }
 
 export function PromptBox({
-  hasAny, hasWeb, hasFile, isAnalyzing, isSearching, hasSearched, onPromptChange,
-  searchMode, subMode,
+  hasAny, hasWeb, hasFile, isAnalyzing, isSearching, hasSearched, hasActiveFilters,
+  onPromptChange, searchMode, subMode,
   onSearch, onAnalyze, onMoreQuestion,
   onClearWeb, onClearFile, onReset,
 }: Props) {
-  const [query,  setQuery]  = useState('')
-  const [mode,   setMode]   = useState<AppMode>('web')
-  const [mathOn, setMathOn] = useState(true)
-  const [deepOn, setDeepOn] = useState(false)
-  const [file,         setFile]         = useState<File | null>(null)
-  const [queryEdited,  setQueryEdited]   = useState(false)
+  const [query,       setQuery]       = useState('')
+  const [mode,        setMode]        = useState<AppMode>('web')
+  const [mathOn,      setMathOn]      = useState(true)
+  const [deepOn,      setDeepOn]      = useState(false)
+  const [file,        setFile]        = useState<File | null>(null)
+  const [queryEdited, setQueryEdited] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const isFile     = mode === 'file'
-  // Search button: active only before first search, or after manual text edit
-  const searchLocked = hasSearched && !queryEdited
+  const isFile = mode === 'file'
+
+  // Search is locked when:
+  // (a) already searched and user hasn't edited the prompt yet, OR
+  // (b) active filters are applied — "Apply filters" is the action, not Search
+  const searchLocked = hasSearched && (!queryEdited || hasActiveFilters)
+
   const canSearch  = !isFile && query.trim().length > 0 && !isSearching && !searchLocked
   const canAnalyze = isFile && !!file && !isAnalyzing
   const canMoreQ   = hasAny
   const canClearW  = hasWeb
   const canClearF  = hasFile
   const canReset   = hasAny || query.trim().length > 0
+
+  // Label + tooltip for the locked state
+  const searchLockedLabel = hasActiveFilters
+    ? 'Use "Apply filters" to refine'
+    : 'Edit prompt to search again'
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]
@@ -84,7 +94,11 @@ export function PromptBox({
       <textarea
         className={styles.textarea}
         value={query}
-        onChange={e => { setQuery(e.target.value); setQueryEdited(true); onPromptChange?.(e.target.value) }}
+        onChange={e => {
+          setQuery(e.target.value)
+          setQueryEdited(true)
+          onPromptChange?.(e.target.value)
+        }}
         onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSearch() }}
         placeholder="Ask anything, search any topic — results appear as interactive cards…"
         rows={3}
@@ -122,12 +136,17 @@ export function PromptBox({
 
       {/* Action buttons */}
       <div className={styles.btnRow}>
-        <button className={`${styles.btn} ${canSearch ? styles.btnPrimary : styles.btnDisabled}`}
-          disabled={!canSearch} onClick={handleSearch}>
+        {/* Search — locked while filters are active */}
+        <button
+          className={`${styles.btn} ${canSearch ? styles.btnPrimary : searchLocked ? styles.btnLocked : styles.btnDisabled}`}
+          disabled={!canSearch}
+          title={searchLocked ? searchLockedLabel : undefined}
+          onClick={handleSearch}
+        >
           {isSearching
             ? <><span className={styles.spinner} /> Searching…</>
             : searchLocked
-            ? <><SearchIcon /> Edit prompt to search again</>
+            ? <><LockIcon /> {searchLockedLabel}</>
             : <><SearchIcon /> Search</>}
         </button>
 
@@ -164,6 +183,7 @@ export function PromptBox({
   )
 }
 
+function LockIcon()   { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> }
 function SearchIcon() { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> }
 function DocIcon()    { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg> }
 function PlusIcon()   { return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> }

@@ -65,6 +65,9 @@
 
 .applyBtn { margin:10px 12px 12px; padding:8px 0; background:var(--navy); color:#fff; border:none; border-radius:var(--r-md); font-size:13px; font-weight:600; cursor:pointer; transition:opacity 0.14s; }
 .applyBtn:hover { opacity:0.87; }
+/* Dimmed state when no filters are pending */
+.applyBtnDim { opacity:0.45; cursor:default; }
+.applyBtnDim:hover { opacity:0.45; }
 
 /* ── Skeleton loading ── */
 .skeleton { padding: 8px 12px; display:flex; flex-direction:column; gap:16px; }

@@ -9,17 +9,17 @@ import {
 import styles from './SidebarFilters.module.css'
 
 interface Props {
-  category:    FilterCategory
-  topic:       string
-  sections:    SidebarFilterSection[]   // for buying-selling (from API)
-  isSearching: boolean
-  resetKey:      number                   // increment to force-reset all filters
-  removedChipId: string | null            // id of chip just removed individually
-  onRefine:      (chips: ActiveFilterChip[]) => void
-  onApply:       (chips: ActiveFilterChip[]) => void
+  category:      FilterCategory
+  topic:         string
+  sections:      SidebarFilterSection[]
+  isSearching:   boolean
+  resetKey:      number
+  removedChipId: string | null
+  onRefine:      (chips: ActiveFilterChip[]) => void   // preview only — no card filtering
+  onApply:       (chips: ActiveFilterChip[]) => void   // actually filters cards
 }
 
-// ── Skeleton loader ───────────────────────────────────────────────
+// ── Skeleton loaders ──────────────────────────────────────────────
 function SkeletonBuying() {
   return (
     <div className={styles.skeleton}>
@@ -62,6 +62,23 @@ function SkeletonAcademia() {
   )
 }
 
+// ── Helpers ───────────────────────────────────────────────────────
+function buildAcademiaChips(
+  checks: Record<string,boolean>,
+  level: string,
+  secA: string,
+  secB: string
+): ActiveFilterChip[] {
+  const chips: ActiveFilterChip[] = []
+  Object.entries(checks).forEach(([label, on]) => {
+    if (on) chips.push({ id: `ck-${label}`, label, value: label, category: 'academia' })
+  })
+  if (level) chips.push({ id: 'level', label: 'Level',     value: level, category: 'academia' })
+  if (secA)  chips.push({ id: 'secA',  label: 'Sub-topic', value: secA,  category: 'academia' })
+  if (secB)  chips.push({ id: 'secB',  label: 'Format',    value: secB,  category: 'academia' })
+  return chips
+}
+
 // ── Academia panel ────────────────────────────────────────────────
 function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
   topic: string
@@ -74,42 +91,40 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
   const secondaryA = ACADEMIA_SECONDARY_A[key] || ACADEMIA_SECONDARY_A.default
   const secondaryB = ACADEMIA_SECONDARY_B[key] || ACADEMIA_SECONDARY_B.default
 
-  const [checks, setChecks]   = useState<Record<string,boolean>>({})
-  const [level,  setLevel]    = useState('')
-  const [secA,   setSecA]     = useState('')
-  const [secB,   setSecB]     = useState('')
+  const [checks, setChecks] = useState<Record<string,boolean>>({})
+  const [level,  setLevel]  = useState('')
+  const [secA,   setSecA]   = useState('')
+  const [secB,   setSecB]   = useState('')
 
   // Reset when topic changes
   useEffect(() => { setChecks({}); setLevel(''); setSecA(''); setSecB('') }, [topic])
 
-  // Uncheck individual item when its chip is removed
+  // Sync when chip is individually removed
   useEffect(() => {
     if (!removedChipId) return
     if (removedChipId === 'level') { setLevel(''); return }
     if (removedChipId === 'secA')  { setSecA('');  return }
     if (removedChipId === 'secB')  { setSecB('');  return }
-    // checkbox chip ids are "ck-{label}"
     if (removedChipId.startsWith('ck-')) {
       const label = removedChipId.slice(3)
       setChecks(prev => ({ ...prev, [label]: false }))
     }
   }, [removedChipId])
 
-  // Emit chips whenever any value changes
+  // Notify parent of chip preview whenever values change
   useEffect(() => {
-    const chips: ActiveFilterChip[] = []
-    Object.entries(checks).forEach(([label, on]) => {
-      if (on) chips.push({ id: `ck-${label}`, label, value: label, category: 'academia' })
-    })
-    if (level) chips.push({ id: 'level', label: 'Level', value: level, category: 'academia' })
-    if (secA)  chips.push({ id: 'secA',  label: 'Sub-topic', value: secA, category: 'academia' })
-    if (secB)  chips.push({ id: 'secB',  label: 'Format', value: secB, category: 'academia' })
-    onChipsChange(chips)
+    onChipsChange(buildAcademiaChips(checks, level, secA, secB))
   }, [checks, level, secA, secB, onChipsChange])
 
   function toggleCheck(label: string) {
     setChecks(prev => ({ ...prev, [label]: !prev[label] }))
   }
+
+  function handleApply() {
+    onApply(buildAcademiaChips(checks, level, secA, secB))
+  }
+
+  const hasPending = Object.values(checks).some(Boolean) || !!level || !!secA || !!secB
 
   return (
     <div className={styles.body}>
@@ -127,53 +142,44 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
         </div>
       </div>
 
-      {/* Level dropdown */}
+      {/* Level */}
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Learner level</div>
         <div className={styles.sectionBody}>
-          <select className={styles.select} value={level}
-            onChange={e => setLevel(e.target.value)}>
+          <select className={styles.select} value={level} onChange={e => setLevel(e.target.value)}>
             <option value="">Any level</option>
             {ACADEMIA_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Secondary A dropdown */}
+      {/* Sub-topic */}
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Sub-topic</div>
         <div className={styles.sectionBody}>
-          <select className={styles.select} value={secA}
-            onChange={e => setSecA(e.target.value)}>
+          <select className={styles.select} value={secA} onChange={e => setSecA(e.target.value)}>
             <option value="">Any sub-topic</option>
             {secondaryA.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Secondary B dropdown */}
+      {/* Format */}
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Format / type</div>
         <div className={styles.sectionBody}>
-          <select className={styles.select} value={secB}
-            onChange={e => setSecB(e.target.value)}>
+          <select className={styles.select} value={secB} onChange={e => setSecB(e.target.value)}>
             <option value="">Any format</option>
             {secondaryB.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </div>
       </div>
 
-      <button className={styles.applyBtn} onClick={() => {
-        const chips: ActiveFilterChip[] = []
-        Object.entries(checks).forEach(([label, on]) => {
-          if (on) chips.push({ id: `ck-${label}`, label, value: label, category: 'academia' })
-        })
-        if (level) chips.push({ id: 'level', label: 'Level', value: level, category: 'academia' })
-        if (secA)  chips.push({ id: 'secA', label: 'Sub-topic', value: secA, category: 'academia' })
-        if (secB)  chips.push({ id: 'secB', label: 'Format', value: secB, category: 'academia' })
-        onApply(chips)
-      }}>
-        Apply filters
+      <button
+        className={`${styles.applyBtn} ${hasPending ? '' : styles.applyBtnDim}`}
+        onClick={handleApply}
+      >
+        {hasPending ? '✓ Apply filters' : 'Apply filters'}
       </button>
     </div>
   )
@@ -189,22 +195,20 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
 }) {
   const topicKey = Object.keys(BUYING_SELLING_FILTERS).find(k => topic.includes(k)) || 'general'
   const displaySections = sections.length > 0 ? sections : BUYING_SELLING_FILTERS[topicKey] || BUYING_SELLING_FILTERS.general
-  const [values, setValues] = useState<Record<string, unknown>>({})
+  const [values,    setValues]    = useState<Record<string, unknown>>({})
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
   useEffect(() => { setValues({}) }, [topic])
 
-  // Remove individual filter when chip x is clicked
+  // Sync when chip is individually removed
   useEffect(() => {
     if (!removedChipId) return
     setValues(prev => {
       const next = { ...prev }
-      // Range / radio / select chip id is just the section id
       if (next[removedChipId] !== undefined) {
         delete next[removedChipId]
         return next
       }
-      // Checkbox chip id is "{sectionId}-{option}"
       const dashIdx = removedChipId.lastIndexOf('-')
       if (dashIdx > 0) {
         const secId = removedChipId.slice(0, dashIdx)
@@ -218,7 +222,8 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
     })
   }, [removedChipId])
 
-  useEffect(() => {
+  // Build chips from current values
+  function buildChips(): ActiveFilterChip[] {
     const chips: ActiveFilterChip[] = []
     displaySections.forEach(sec => {
       const v = values[sec.id]
@@ -237,29 +242,39 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
         }
       }
     })
-    onChipsChange(chips)
-  }, [values, displaySections, onChipsChange])
+    return chips
+  }
+
+  // Notify parent of chip preview whenever values change
+  useEffect(() => {
+    onChipsChange(buildChips())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [values, displaySections])
 
   function setCheck(secId: string, opt: string, checked: boolean) {
     setValues(prev => ({ ...prev, [secId]: { ...((prev[secId] as Record<string,boolean>) || {}), [opt]: checked } }))
   }
-  function setRadio(secId: string, val: string) { setValues(prev => ({ ...prev, [secId]: val })) }
+  function setRadio(secId: string, val: string)  { setValues(prev => ({ ...prev, [secId]: val })) }
   function setSelect(secId: string, val: string) { setValues(prev => ({ ...prev, [secId]: val })) }
   function setRange(secId: string, which: 'min'|'max', val: string) {
     setValues(prev => ({ ...prev, [secId]: { ...((prev[secId] as Record<string,string>) || {}), [which]: val } }))
   }
 
+  const hasPending = buildChips().length > 0
+
   return (
     <div className={styles.body}>
       {displaySections.map(sec => (
         <div key={sec.id} className={styles.section}>
-          <button className={styles.sectionHeader} onClick={() => setCollapsed(p => ({ ...p, [sec.id]: !p[sec.id] }))}>
+          <button className={styles.sectionHeader}
+            onClick={() => setCollapsed(p => ({ ...p, [sec.id]: !p[sec.id] }))}>
             <span className={styles.sectionLabel}>{sec.label}</span>
             <svg className={`${styles.chevron} ${collapsed[sec.id] ? styles.chevronCollapsed : ''}`}
               width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M3 4.5L6 7.5L9 4.5"/>
             </svg>
           </button>
+
           {!collapsed[sec.id] && (
             <div className={styles.sectionBody}>
               {sec.type === 'checkboxes' && sec.options?.map(opt => (
@@ -302,45 +317,29 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
           )}
         </div>
       ))}
-      <button className={styles.applyBtn} onClick={() => {
-        const chips: ActiveFilterChip[] = []
-        displaySections.forEach(sec => {
-          const v = values[sec.id]
-          if (!v) return
-          if (sec.type === 'checkboxes' && typeof v === 'object') {
-            Object.entries(v as Record<string,boolean>).forEach(([opt, on]) => {
-              if (on) chips.push({ id: `${sec.id}-${opt}`, label: sec.label, value: opt, category: 'buying-selling' })
-            })
-          } else if (sec.type === 'radio' || sec.type === 'select') {
-            if (v) chips.push({ id: sec.id, label: sec.label, value: String(v), category: 'buying-selling' })
-          } else if (sec.type === 'range') {
-            const r = v as { min?: string; max?: string }
-            if (r.min || r.max) {
-              const val = [r.min && `${sec.unit || ''}${r.min}`, r.max && `${sec.unit || ''}${r.max}`].filter(Boolean).join(' – ')
-              chips.push({ id: sec.id, label: sec.label, value: val, category: 'buying-selling' })
-            }
-          }
-        })
-        onApply(chips)
-      }}>
-        Apply filters
+
+      <button
+        className={`${styles.applyBtn} ${hasPending ? '' : styles.applyBtnDim}`}
+        onClick={() => onApply(buildChips())}
+      >
+        {hasPending ? '✓ Apply filters' : 'Apply filters'}
       </button>
     </div>
   )
 }
 
 // ── Main export ───────────────────────────────────────────────────
-export function SidebarFilters({ category, topic, sections, isSearching, resetKey, removedChipId, onRefine, onApply }: Props) {
+export function SidebarFilters({
+  category, topic, sections, isSearching,
+  resetKey, removedChipId, onRefine, onApply
+}: Props) {
   const [chips, setChips] = useState<ActiveFilterChip[]>([])
 
-  // When resetKey changes (from parent Clear All), wipe local chips too
-  useEffect(() => {
-    setChips([])
-  }, [resetKey])
+  useEffect(() => { setChips([]) }, [resetKey])
 
   function handleChips(incoming: ActiveFilterChip[]) {
     setChips(incoming)
-    onRefine(incoming)
+    onRefine(incoming)   // preview only — parent updates chip display but NOT cards
   }
 
   const hasAny = chips.length > 0
@@ -360,10 +359,22 @@ export function SidebarFilters({ category, topic, sections, isSearching, resetKe
       {isSearching ? (
         category === 'academia' ? <SkeletonAcademia /> : <SkeletonBuying />
       ) : category === 'academia' ? (
-        // key=resetKey forces full remount → resets all checkboxes/dropdowns
-        <AcademiaPanel key={`acad-${resetKey}`} topic={topic} removedChipId={removedChipId} onChipsChange={handleChips} onApply={onApply} />
+        <AcademiaPanel
+          key={`acad-${resetKey}`}
+          topic={topic}
+          removedChipId={removedChipId}
+          onChipsChange={handleChips}
+          onApply={onApply}
+        />
       ) : (
-        <BuyingSellingPanel key={`buy-${resetKey}`} topic={topic} sections={sections} removedChipId={removedChipId} onChipsChange={handleChips} onApply={onApply} />
+        <BuyingSellingPanel
+          key={`buy-${resetKey}`}
+          topic={topic}
+          sections={sections}
+          removedChipId={removedChipId}
+          onChipsChange={handleChips}
+          onApply={onApply}
+        />
       )}
     </aside>
   )
