@@ -8,9 +8,8 @@
 .cardWrapper {
   display: flex;
   flex-direction: column;
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   overflow: hidden;
-  /* No cursor here — handle and body each set their own */
 }
 
 /* ── Drag handle strip ── */
@@ -20,9 +19,9 @@
   justify-content: center;
   height: 22px;
   background: var(--surface-2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-mid);
   border-bottom: none;
-  border-radius: var(--r-md) var(--r-md) 0 0;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
   color: var(--text-3);
   cursor: grab;
   user-select: none;
@@ -35,23 +34,16 @@
   color: var(--text-2);
 }
 
-/* While dragging — grabbing hand */
+/* While actively dragging */
 .dragHandleActive {
   cursor: grabbing;
   background: var(--border-mid);
   color: var(--text-1);
 }
 
-/* ── Card body — everything below the handle ── */
+/* ── Card body wrapper ── */
 .cardBody {
-  cursor: pointer;
   flex: 1;
-  /* Lets SearchCard's own border-radius show on the bottom corners */
-  border-radius: 0 0 var(--r-md) var(--r-md);
-  overflow: hidden;
-}
-
-/* Prevent the click-to-expand firing on buttons inside the card */
-.cardBody button {
+  /* pointer cursor on the wrapper so it shows through where SearchCard has no explicit cursor */
   cursor: pointer;
 }

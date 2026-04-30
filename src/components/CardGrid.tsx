@@ -33,7 +33,13 @@ function SortableCard({ card, zone, expandedId, onExpand, onDismiss, onToggleDoc
       </div>
 
       {/* ── Card body — pointer cursor, click to expand ── */}
-      <div className={styles.cardBody} onClick={() => onExpand(card.id)}>
+      <div className={styles.cardBody} onClick={e => {
+        // Only expand if the click came from the card content area, not footer buttons
+        const target = e.target as HTMLElement
+        if (!target.closest('button') && !target.closest('input') && !target.closest('label')) {
+          onExpand(card.id)
+        }
+      }}>
         <SearchCard
           card={card} zone={zone}
           faded={expandedId !== null && card.id !== expandedId}

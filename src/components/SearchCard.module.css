@@ -20,25 +20,23 @@
 .docSelected { border: 2px solid var(--gold); background: var(--gold-light); }
 .docSelected:hover { border-color: var(--gold); }
 
-/* ── Drag handle / scrollable body ───────────────────────── */
-.dragHandle {
+/* ── Scrollable card body ─────────────────────────────────── */
+.cardContent {
   padding: 11px 12px 6px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  cursor: grab;
-  /* scrollable when content overflows fixed height */
+  cursor: pointer;
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
 }
-.dragHandle:active { cursor: grabbing; }
 
 /* subtle scrollbar */
-.dragHandle::-webkit-scrollbar { width: 3px; }
-.dragHandle::-webkit-scrollbar-track { background: transparent; }
-.dragHandle::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+.cardContent::-webkit-scrollbar { width: 3px; }
+.cardContent::-webkit-scrollbar-track { background: transparent; }
+.cardContent::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
 
 /* ── Header row ───────────────────────────────────────────── */
 .header    { display:flex; align-items:center; gap:5px; flex-wrap:wrap; flex-shrink:0; }

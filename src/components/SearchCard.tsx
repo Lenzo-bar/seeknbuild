@@ -51,7 +51,7 @@ export function SearchCard({
       style={style}
     >
       {/* ── Scrollable body with subtle drag handle ── */}
-      <div className={styles.dragHandle} {...dragListeners} {...dragAttributes}>
+      <div className={styles.cardContent}>
 
         <div className={styles.header}>
           <span className={`${styles.rank} ${rankClass}`}>#{card.rank}</span>
