@@ -93,10 +93,15 @@ export default function App() {
     setSearchMode(mode); setSubMode(sub)
   }
 
-  // Clear isFirstSearch (skeleton) once search finishes
+  // Once search completes: clear skeleton, and mark sidebar as populated.
+  // sameCtxConfirmed=true means "sidebar exists — protect it from any subsequent Search."
+  // It only resets on user clicking Reset or answering No to the dialog.
   useEffect(() => {
-    if (!isSearching) setIsFirstSearch(false)
-  }, [isSearching])
+    if (!isSearching && hasSearched) {
+      setIsFirstSearch(false)
+      setSameCtxConfirmed(true)
+    }
+  }, [isSearching, hasSearched])
 
   // ── Fresh search — wipes filter bar ──────────────────────────────
   function freshSearch(query: string, mode: SearchMode, sub: string) {
@@ -104,8 +109,8 @@ export default function App() {
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setLockedTopic(query)
-    setSameCtxConfirmed(false)
-    setIsFirstSearch(true)          // show skeleton during this search only
+    setSameCtxConfirmed(false)  // cleared now; effect restores it when search completes
+    setIsFirstSearch(true)
     search(query, mode, sub, false)
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
@@ -122,32 +127,38 @@ export default function App() {
   function handleSearch(query: string) {
     const { mode } = fuseSearchMode(searchMode, query)
     if (!hasSearched) {
-      freshSearch(query, mode, subMode)           // very first search — always fresh
+      freshSearch(query, mode, subMode)       // very first ever search — always fresh
     } else if (sameCtxConfirmed) {
-      sameCtxSearch(query, mode, subMode)         // user said Yes → keep filters
+      sameCtxSearch(query, mode, subMode)     // sidebar confirmed same context → keep it
+    } else if (showTopicDialog) {
+      // Dialog is open — don't search yet, wait for Yes/No answer
+      return
     } else {
-      freshSearch(query, mode, subMode)           // user said No, or no filters — fresh
+      freshSearch(query, mode, subMode)       // user said No → fresh search
     }
   }
 
-  // ── Prompt onChange — show dialog once when filters are active ────
+  // ── Prompt onChange — show dialog on any edit once sidebar is populated ──
+  // The trigger is sameCtxConfirmed (sidebar exists), NOT activeChips.length.
+  // User must explicitly answer Yes/No before Search runs.
   function handlePromptChange(q: string) {
     if (
       hasSearched &&
-      activeChips.length > 0 &&
+      sameCtxConfirmed &&
       !showTopicDialog &&
-      !sameCtxConfirmed &&
       q.trim().length > 0 &&
       q !== lockedTopic
     ) {
       setShowTopicDialog(true)
+      // Temporarily pause sameCtxConfirmed so Search waits for dialog answer
+      setSameCtxConfirmed(false)
     }
   }
 
-  // ── Dialog: Yes — keep filter bar, user then clicks Search ────────
+  // ── Dialog: Yes — keep sidebar, user clicks Search normally ──────
   function handleDialogYes() {
     setShowTopicDialog(false)
-    setSameCtxConfirmed(true)   // real state → triggers re-render → Search uses sameCtxSearch
+    setSameCtxConfirmed(true)   // restore protection → Search will use sameCtxSearch
   }
 
   // ── Dialog: No — clear filters, user then clicks Search fresh ─────

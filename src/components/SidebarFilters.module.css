@@ -51,7 +51,11 @@
 .chevron { transition:transform 0.15s; color:var(--text-3); }
 .chevronCollapsed { transform: rotate(-90deg); }
 
-.sectionBody { padding: 4px 12px 10px; display:flex; flex-direction:column; gap:3px; }
+.sectionBody { padding: 4px 12px 10px; display:flex; flex-direction:column; gap:3px; overflow-y: auto; }
+.sectionBody::-webkit-scrollbar              { width: 0; }
+.sectionBody::-webkit-scrollbar-thumb        { background: transparent; border-radius: 2px; }
+.sectionBody.scrollVisible::-webkit-scrollbar       { width: 3px; }
+.sectionBody.scrollVisible::-webkit-scrollbar-thumb { background: var(--border-mid); }
 
 /* ── Inputs ── */
 .checkItem { display:flex; align-items:center; gap:8px; padding:3px 2px; border-radius:var(--r-sm); cursor:pointer; transition:background 0.1s; }
@@ -65,11 +69,8 @@
 .rangeInput { flex:1; min-width:0; padding:5px 6px; border:1px solid var(--border); border-radius:var(--r-sm); background:var(--surface-2); color:var(--text-1); font-size:12px; font-family:inherit; }
 .rangeSep { font-size:12px; color:var(--text-3); flex-shrink:0; }
 
-.applyBtn { margin:10px 12px 12px; padding:8px 0; background:var(--navy); color:#fff; border:none; border-radius:var(--r-md); font-size:13px; font-weight:600; cursor:pointer; transition:opacity 0.14s; }
+.applyBtn { margin:10px 12px 12px; padding:8px 0; background:var(--navy); color:#fff; border:none; border-radius:var(--r-md); font-size:13px; font-weight:600; cursor:pointer; transition:opacity 0.14s, background 0.14s; }
 .applyBtn:hover { opacity:0.87; }
-/* Dimmed state when no filters are pending */
-.applyBtnDim { opacity:0.45; cursor:default; }
-.applyBtnDim:hover { opacity:0.45; }
 
 /* ── Skeleton loading ── */
 .skeleton { padding: 8px 12px; display:flex; flex-direction:column; gap:16px; }

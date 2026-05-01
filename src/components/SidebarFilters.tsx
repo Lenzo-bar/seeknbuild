@@ -167,10 +167,10 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply, resetKey 
       </div>
 
       <button
-        className={`${styles.applyBtn} ${hasPending ? '' : styles.applyBtnDim}`}
+        className={styles.applyBtn}
         onClick={() => onApply(buildAcademiaChips(checks, level, secA, secB))}
       >
-        {hasPending ? '✓ Apply filters' : 'Apply filters'}
+        {hasPending ? '✓ Apply filters' : '↩ Revert to previous results'}
       </button>
     </div>
   )
@@ -336,10 +336,10 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
       })}
 
       <button
-        className={`${styles.applyBtn} ${hasPending ? '' : styles.applyBtnDim}`}
+        className={styles.applyBtn}
         onClick={() => onApply(buildChips())}
       >
-        {hasPending ? '✓ Apply filters' : 'Apply filters'}
+        {hasPending ? '✓ Apply filters' : '↩ Revert to previous results'}
       </button>
     </div>
   )
