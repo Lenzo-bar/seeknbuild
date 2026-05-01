@@ -138,13 +138,15 @@ export function useCards() {
   const hasLinks = linkResults.length > 0
   const hasAny   = hasWeb || hasFile || hasMore
 
-  const search = useCallback(async (query: string, searchMode: SearchMode = 'all', subMode = '') => {
+  const search = useCallback(async (query: string, searchMode: SearchMode = 'all', subMode = '', keepFilters = false) => {
     setIsSearching(true)
     setApiError(null)
     setWebCards([])
     setLinkResults([])
-    // Show immediate default filters while waiting
-    setSidebarFilters(DEFAULT_FILTERS[detectTopic(query)] || DEFAULT_FILTERS.general)
+    // Only reset sidebar filters on a brand-new search
+    if (!keepFilters) {
+      setSidebarFilters(DEFAULT_FILTERS[detectTopic(query)] || DEFAULT_FILTERS.general)
+    }
 
     setLastQuery(query)
     setLastMode(searchMode)
@@ -159,8 +161,10 @@ export function useCards() {
       setSearchTime(Date.now() - searchStart)
       setFilterTime(null)
       setLinkResults(result.links)
-      setSidebarFilters(result.sidebarFilters)
-      setCurrentTopic(result.topic || "")
+      if (!keepFilters) {
+        setSidebarFilters(result.sidebarFilters)
+        setCurrentTopic(result.topic || "")
+      }
     } catch (err) {
       setApiError(err instanceof Error ? err.message : String(err))
     } finally {

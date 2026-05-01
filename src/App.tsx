@@ -74,19 +74,17 @@ export default function App() {
   const [subMode,      setSubMode]      = useState('')
   const [activeChips,  setActiveChips]  = useState<ActiveFilterChip[]>([])
   const [filterCat,    setFilterCat]    = useState<FilterCategory>('general')
-  const [filterResetKey,    setFilterResetKey]    = useState(0)
-  const [locationRefreshKey, setLocationRefreshKey] = useState(0)  // bumped when only location section should refresh
-  const [removedChipId,     setRemovedChipId]     = useState<string | null>(null)
+  const [filterResetKey,     setFilterResetKey]     = useState(0)
+  const [locationRefreshKey, setLocationRefreshKey] = useState(0)
+  const [removedChipId,      setRemovedChipId]      = useState<string | null>(null)
 
   // Topic-persistence dialog
   const [showTopicDialog, setShowTopicDialog] = useState(false)
-  const [lockedTopic,     setLockedTopic]     = useState<string>('')
-
-  // dialogAnsweredYes = user said "Yes, keep filters" this session.
-  // Stays true until a full reset or new search. Prevents re-triggering the dialog.
-  const dialogAnsweredYes = useRef(false)
-  // dialogConfirmed as real state so PromptBox re-renders when it changes
-  const [dialogConfirmed, setDialogConfirmed] = useState(false)
+  const [lockedTopic,     setLockedTopic]     = useState('')
+  // Stores the pending query while dialog is open so Search can fire after answer
+  const pendingQuery = useRef<{ q: string; mode: SearchMode; sub: string } | null>(null)
+  // Whether user confirmed same context — resets on every fresh search / reset
+  const sameContextConfirmed = useRef(false)
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme])
 
@@ -94,79 +92,79 @@ export default function App() {
     setSearchMode(mode); setSubMode(sub)
   }
 
-  // ── Execute a completely fresh search (wipes all filters) ─────────
-  function executeSearch(query: string, mode: SearchMode, sub: string) {
+  // ── Fresh search — wipes filter bar completely ────────────────────
+  function freshSearch(query: string, mode: SearchMode, sub: string) {
     const cat = detectCategory(query, '')
     setFilterCat(cat)
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setLockedTopic(query)
-    dialogAnsweredYes.current = false
-    setDialogConfirmed(false)
-    search(query, mode, sub)
+    sameContextConfirmed.current = false
+    search(query, mode, sub, false)          // keepFilters = false
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
 
+  // ── Same-context search — keeps filter bar, just replaces cards + links ──
+  function sameContextSearch(query: string, mode: SearchMode, sub: string) {
+    setLockedTopic(query)
+    search(query, mode, sub, true)           // keepFilters = true
+    setExpandedId(null)
+    // Re-apply active chips to new results once they arrive
+    // (clientRefine will run against new allWebCards automatically via handleApply)
+  }
+
   // ── Search button pressed ─────────────────────────────────────────
-  // Rules:
-  // • No prior search, or no active filters → search immediately
-  // • User already said "Yes" this session → search immediately (same context, keep filters)
-  // • Active filters + no answer yet → show dialog first
+  // Simple rule: if dialog is still open, ignore (shouldn't happen).
+  // If this is the very first search → fresh. Otherwise prompt onChange
+  // already handled the dialog; by the time Search is clicked the answer is known.
   function handleSearch(query: string) {
     const { mode } = fuseSearchMode(searchMode, query)
-
-    if (!hasSearched || activeChips.length === 0 || dialogAnsweredYes.current) {
-      // If location changed and user had said Yes, only refresh location section of sidebar
-      if (dialogAnsweredYes.current && lockedTopic && locationChanged(lockedTopic, query)) {
-        setLocationRefreshKey(k => k + 1)
-      }
-      // Same context confirmed — run search but preserve filters
-      if (dialogAnsweredYes.current) {
-        setLockedTopic(query)
-        search(query, mode, subMode)
-        setExpandedId(null)
-      } else {
-        executeSearch(query, mode, subMode)
-      }
+    if (!hasSearched) {
+      // First ever search — always fresh, no dialog
+      freshSearch(query, mode, subMode)
+    } else if (sameContextConfirmed.current) {
+      // User already said Yes → keep filters, just re-search
+      sameContextSearch(query, mode, subMode)
     } else {
-      // Active filters present and user hasn't answered yet — ask first
-      setShowTopicDialog(true)
+      // No active filters, or user said No (chips already cleared) → fresh
+      freshSearch(query, mode, subMode)
     }
   }
 
-  // ── Prompt edit handler ───────────────────────────────────────────
-  // Show dialog ONCE per session: only if filters active, user hasn't answered, dialog not open.
+  // ── Prompt onChange — show dialog exactly once when filters are active ──
   function handlePromptChange(q: string) {
     if (
       hasSearched &&
       activeChips.length > 0 &&
       !showTopicDialog &&
-      !dialogAnsweredYes.current &&
+      !sameContextConfirmed.current &&
       q.trim().length > 0 &&
       q !== lockedTopic
     ) {
+      pendingQuery.current = { q, mode: fuseSearchMode(searchMode, q).mode, sub: subMode }
       setShowTopicDialog(true)
     }
   }
 
-  // ── Dialog: Yes ───────────────────────────────────────────────────
-  // Mark session as confirmed. Dialog will NOT re-appear for the rest of this editing session.
+  // ── Dialog: Yes — keep filter bar, re-search with pending query ───
   function handleDialogYes() {
     setShowTopicDialog(false)
-    dialogAnsweredYes.current = true
-    setDialogConfirmed(true)   // triggers PromptBox re-render — Search unlocks
+    sameContextConfirmed.current = true
+    // Don't auto-search here — user still needs to click Search.
+    // Just unlock the button by letting the render know confirmed = true.
+    // (sameContextConfirmed.current drives handleSearch path selection)
   }
 
-  // ── Dialog: No ───────────────────────────────────────────────────
+  // ── Dialog: No — clear everything, user will click Search fresh ───
   function handleDialogNo() {
     setShowTopicDialog(false)
-    dialogAnsweredYes.current = false
-    setDialogConfirmed(false)
+    sameContextConfirmed.current = false
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setFilterCat('general')
     setLockedTopic('')
     clientRefine([])
+    pendingQuery.current = null
   }
 
   useEffect(() => {
@@ -203,8 +201,8 @@ export default function App() {
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setLockedTopic('')
-    dialogAnsweredYes.current = false
-    setDialogConfirmed(false)
+    sameContextConfirmed.current = false
+    pendingQuery.current = null
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
 
@@ -213,7 +211,7 @@ export default function App() {
     : null
   const allVisible = [...webCards, ...fileCards, ...moreCards]
 
-  // Filter link results by active chips (same keyword matching as cards)
+  // Filter link results by active chips — same context as card filtering
   const filteredLinks = activeChips.length === 0 ? linkResults : linkResults.filter(link => {
     const text = (link.title + ' ' + link.snippet + ' ' + link.url).toLowerCase()
     return activeChips.every(chip => text.includes(chip.value.toLowerCase()))
@@ -335,7 +333,6 @@ export default function App() {
             isAnalyzing={isAnalyzing} isSearching={isSearching}
             hasSearched={hasSearched}
             hasActiveFilters={activeChips.length > 0}
-            dialogConfirmed={dialogConfirmed}
             searchMode={searchMode} subMode={subMode}
             onSearch={(q, _mode, _sub) => handleSearch(q)}
             onPromptChange={handlePromptChange}
