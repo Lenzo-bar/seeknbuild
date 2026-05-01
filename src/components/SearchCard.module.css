@@ -33,10 +33,11 @@
   min-height: 0;
 }
 
-/* subtle scrollbar */
+/* scrollbar — hidden by default, appears on card hover */
 .cardContent::-webkit-scrollbar { width: 3px; }
 .cardContent::-webkit-scrollbar-track { background: transparent; }
-.cardContent::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+.cardContent::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; transition: background 0.2s; }
+.card:hover .cardContent::-webkit-scrollbar-thumb { background: var(--border-mid); }
 
 /* ── Header row ───────────────────────────────────────────── */
 .header    { display:flex; align-items:center; gap:5px; flex-wrap:wrap; flex-shrink:0; }

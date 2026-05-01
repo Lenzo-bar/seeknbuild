@@ -51,7 +51,12 @@
   gap: 8px;
   cursor: pointer;
   min-width: 0;
+  overflow-y: auto;
 }
+
+.body::-webkit-scrollbar { width: 3px; }
+.body::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; transition: background 0.2s; }
+.banner:hover .body::-webkit-scrollbar-thumb { background: var(--border-mid); }
 
 /* ── Header row ───────────────────────────────────────────── */
 .header {
