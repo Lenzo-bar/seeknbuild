@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { PromptBox }          from './components/PromptBox'
 import { SearchModeBar }      from './components/SearchModeBar'
 import { SidebarFilters }     from './components/SidebarFilters'
@@ -79,12 +79,10 @@ export default function App() {
   const [removedChipId,      setRemovedChipId]      = useState<string | null>(null)
 
   // Topic-persistence dialog
-  const [showTopicDialog, setShowTopicDialog] = useState(false)
-  const [lockedTopic,     setLockedTopic]     = useState('')
-  // Stores the pending query while dialog is open so Search can fire after answer
-  const pendingQuery = useRef<{ q: string; mode: SearchMode; sub: string } | null>(null)
-  // Whether user confirmed same context — resets on every fresh search / reset
-  const sameContextConfirmed = useRef(false)
+  const [showTopicDialog,   setShowTopicDialog]   = useState(false)
+  const [lockedTopic,       setLockedTopic]       = useState('')
+  // useState (not useRef) so Search button re-renders when user answers dialog
+  const [sameCtxConfirmed,  setSameCtxConfirmed]  = useState(false)
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme])
 
@@ -92,79 +90,65 @@ export default function App() {
     setSearchMode(mode); setSubMode(sub)
   }
 
-  // ── Fresh search — wipes filter bar completely ────────────────────
+  // ── Fresh search — wipes filter bar ──────────────────────────────
   function freshSearch(query: string, mode: SearchMode, sub: string) {
-    const cat = detectCategory(query, '')
-    setFilterCat(cat)
+    setFilterCat(detectCategory(query, ''))
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setLockedTopic(query)
-    sameContextConfirmed.current = false
-    search(query, mode, sub, false)          // keepFilters = false
+    setSameCtxConfirmed(false)
+    search(query, mode, sub, false)   // keepFilters = false → sidebar resets
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
 
-  // ── Same-context search — keeps filter bar, just replaces cards + links ──
-  function sameContextSearch(query: string, mode: SearchMode, sub: string) {
+  // ── Same-context search — keeps filter bar, replaces cards + links ─
+  function sameCtxSearch(query: string, mode: SearchMode, sub: string) {
     setLockedTopic(query)
-    search(query, mode, sub, true)           // keepFilters = true
+    search(query, mode, sub, true)    // keepFilters = true → sidebar untouched
     setExpandedId(null)
-    // Re-apply active chips to new results once they arrive
-    // (clientRefine will run against new allWebCards automatically via handleApply)
   }
 
-  // ── Search button pressed ─────────────────────────────────────────
-  // Simple rule: if dialog is still open, ignore (shouldn't happen).
-  // If this is the very first search → fresh. Otherwise prompt onChange
-  // already handled the dialog; by the time Search is clicked the answer is known.
+  // ── Search button clicked ─────────────────────────────────────────
   function handleSearch(query: string) {
     const { mode } = fuseSearchMode(searchMode, query)
     if (!hasSearched) {
-      // First ever search — always fresh, no dialog
-      freshSearch(query, mode, subMode)
-    } else if (sameContextConfirmed.current) {
-      // User already said Yes → keep filters, just re-search
-      sameContextSearch(query, mode, subMode)
+      freshSearch(query, mode, subMode)           // very first search — always fresh
+    } else if (sameCtxConfirmed) {
+      sameCtxSearch(query, mode, subMode)         // user said Yes → keep filters
     } else {
-      // No active filters, or user said No (chips already cleared) → fresh
-      freshSearch(query, mode, subMode)
+      freshSearch(query, mode, subMode)           // user said No, or no filters — fresh
     }
   }
 
-  // ── Prompt onChange — show dialog exactly once when filters are active ──
+  // ── Prompt onChange — show dialog once when filters are active ────
   function handlePromptChange(q: string) {
     if (
       hasSearched &&
       activeChips.length > 0 &&
       !showTopicDialog &&
-      !sameContextConfirmed.current &&
+      !sameCtxConfirmed &&
       q.trim().length > 0 &&
       q !== lockedTopic
     ) {
-      pendingQuery.current = { q, mode: fuseSearchMode(searchMode, q).mode, sub: subMode }
       setShowTopicDialog(true)
     }
   }
 
-  // ── Dialog: Yes — keep filter bar, re-search with pending query ───
+  // ── Dialog: Yes — keep filter bar, user then clicks Search ────────
   function handleDialogYes() {
     setShowTopicDialog(false)
-    sameContextConfirmed.current = true
-    // Don't auto-search here — user still needs to click Search.
-    // Just unlock the button by letting the render know confirmed = true.
-    // (sameContextConfirmed.current drives handleSearch path selection)
+    setSameCtxConfirmed(true)   // real state → triggers re-render → Search uses sameCtxSearch
   }
 
-  // ── Dialog: No — clear everything, user will click Search fresh ───
+  // ── Dialog: No — clear filters, user then clicks Search fresh ─────
   function handleDialogNo() {
     setShowTopicDialog(false)
-    sameContextConfirmed.current = false
+    setSameCtxConfirmed(false)
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setFilterCat('general')
     setLockedTopic('')
     clientRefine([])
-    pendingQuery.current = null
   }
 
   useEffect(() => {
@@ -201,8 +185,7 @@ export default function App() {
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setLockedTopic('')
-    sameContextConfirmed.current = false
-    pendingQuery.current = null
+    setSameCtxConfirmed(false)
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
 
@@ -211,7 +194,7 @@ export default function App() {
     : null
   const allVisible = [...webCards, ...fileCards, ...moreCards]
 
-  // Filter link results by active chips — same context as card filtering
+  // Filter link results by active chips — mirrors card filtering
   const filteredLinks = activeChips.length === 0 ? linkResults : linkResults.filter(link => {
     const text = (link.title + ' ' + link.snippet + ' ' + link.url).toLowerCase()
     return activeChips.every(chip => text.includes(chip.value.toLowerCase()))
