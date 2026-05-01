@@ -35,6 +35,9 @@
 .body::-webkit-scrollbar-thumb        { background: transparent; border-radius: 2px; }
 .body.scrollVisible::-webkit-scrollbar       { width: 3px; }
 .body.scrollVisible::-webkit-scrollbar-thumb { background: var(--border-mid); }
+/* Firefox */
+.body                { scrollbar-width: none; }
+.body.scrollVisible  { scrollbar-width: thin; scrollbar-color: var(--border-mid) transparent; }
 
 /* ── Sections ── */
 .section { border-bottom: 1px solid var(--border); }

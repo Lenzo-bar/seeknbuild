@@ -119,10 +119,7 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply, resetKey 
   const hasPending = Object.values(checks).some(Boolean) || !!level || !!secA || !!secB
 
   return (
-    <div className={styles.body}
-      onMouseEnter={e => (e.currentTarget as HTMLElement).classList.add(styles.scrollVisible)}
-      onMouseLeave={e => (e.currentTarget as HTMLElement).classList.remove(styles.scrollVisible)}
-    >
+    <div className={styles.body}>
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Primary filters</div>
         <div className={styles.sectionBody}>
@@ -270,10 +267,7 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
   const hasPending = buildChips().length > 0
 
   return (
-    <div className={styles.body}
-      onMouseEnter={e => (e.currentTarget as HTMLElement).classList.add(styles.scrollVisible)}
-      onMouseLeave={e => (e.currentTarget as HTMLElement).classList.remove(styles.scrollVisible)}
-    >
+    <div className={styles.body}>
       {displaySections.map(sec => {
         const isLocationSec = LOCATION_SECTION_IDS.has(sec.id)
         return (
@@ -363,7 +357,10 @@ export function SidebarFilters({
   const hasAny = chips.length > 0
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={styles.sidebar}
+      onMouseEnter={e => e.currentTarget.querySelector(`.${styles.body}`)?.classList.add(styles.scrollVisible)}
+      onMouseLeave={e => e.currentTarget.querySelector(`.${styles.body}`)?.classList.remove(styles.scrollVisible)}
+    >
       <div className={styles.header}>
         <span className={styles.headerTitle}>Refine results</span>
         <span className={styles.categoryBadge}>
