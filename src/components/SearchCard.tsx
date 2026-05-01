@@ -19,6 +19,7 @@ interface Props {
   card:             CardData
   zone:             CardZone
   faded:            boolean
+  isDragging?:      boolean
   dragListeners?:   Record<string, unknown>
   dragAttributes?:  Record<string, unknown>
   style?:           React.CSSProperties
@@ -28,7 +29,7 @@ interface Props {
 }
 
 export function SearchCard({
-  card, zone, faded, dragListeners, dragAttributes, style,
+  card, zone, faded, isDragging, dragListeners, dragAttributes, style,
   onExpand, onDismiss, onToggleDoc,
 }: Props) {
   const rankClass  = zone === 'web' ? styles.rankWeb : zone === 'file' ? styles.rankFile : styles.rankMore
@@ -50,8 +51,11 @@ export function SearchCard({
       className={`${styles.card} ${faded ? styles.faded : ''} ${card.docSelected ? styles.docSelected : ''}`}
       style={style}
     >
-      {/* ── Scrollable body with subtle drag handle ── */}
-      <div className={styles.cardContent}>
+      {/* ── Scrollable body ── */}
+      <div className={styles.cardContent} onClick={e => {
+        const target = e.target as HTMLElement
+        if (!target.closest('button') && !target.closest('input') && !target.closest('label')) onExpand()
+      }}>
 
         <div className={styles.header}>
           <span className={`${styles.rank} ${rankClass}`}>#{card.rank}</span>
@@ -61,6 +65,16 @@ export function SearchCard({
               {card.source.replace(/^https?:\/\//, '').split('/')[0]}
             </span>
           )}
+          {/* ── Drag grip — lives inside the card header, far right ── */}
+          <div
+            className={`${styles.grip} ${isDragging ? styles.gripDragging : ''}`}
+            {...dragListeners}
+            {...dragAttributes}
+            title="Drag to reorder"
+            onClick={e => e.stopPropagation()}
+          >
+            <GripIcon />
+          </div>
         </div>
 
         {card.hasVideo && <div className={styles.vidThumb}>▶</div>}
@@ -166,3 +180,4 @@ function MailIcon()   { return <svg width="14" height="14" viewBox="0 0 24 24" f
 function MsgIcon()    { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> }
 function ExpandIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg> }
 function CloseIcon()  { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> }
+function GripIcon()   { return <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3" r="1.2"/><circle cx="11" cy="3" r="1.2"/><circle cx="5" cy="8" r="1.2"/><circle cx="11" cy="8" r="1.2"/><circle cx="5" cy="13" r="1.2"/><circle cx="11" cy="13" r="1.2"/></svg> }

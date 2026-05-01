@@ -53,7 +53,30 @@
 .badgeForum   { background:#FF4500; color:#fff; }
 .badgeShopping{ background:#D1FAE5; color:#065F46; }
 
-.source { font-size:10px; color:var(--text-3); margin-left:auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px; }
+.source { font-size:10px; color:var(--text-3); margin-left:auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:90px; }
+
+/* ── Drag grip — sits at far right of header row ── */
+.grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--border-mid);
+  cursor: grab;
+  flex-shrink: 0;
+  margin-left: 4px;
+  transition: color 0.12s, background 0.12s;
+}
+.grip:hover {
+  color: var(--text-3);
+  background: var(--surface-2);
+}
+.gripDragging {
+  cursor: grabbing;
+  color: var(--text-2);
+}
 
 /* ── Content ──────────────────────────────────────────────── */
 .vidThumb  { background:#0d1117; border-radius:var(--r-sm); height:44px; display:flex; align-items:center; justify-content:center; color:#93C5FD; font-size:18px; flex-shrink:0; }

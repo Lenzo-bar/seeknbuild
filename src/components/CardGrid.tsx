@@ -22,34 +22,16 @@ function SortableCard({ card, zone, expandedId, onExpand, onDismiss, onToggleDoc
         opacity: isDragging ? 0.55 : undefined,
       }}
     >
-      {/* ── Drag handle — grab cursor lives here only ── */}
-      <div
-        className={`${styles.dragHandle} ${isDragging ? styles.dragHandleActive : ''}`}
-        {...listeners}
-        {...attributes}
-        title="Drag to reorder"
-      >
-        <GripIcon />
-      </div>
-
-      {/* ── Card body — pointer cursor, click to expand ── */}
-      <div className={styles.cardBody} onClick={e => {
-        // Only expand if the click came from the card content area, not footer buttons
-        const target = e.target as HTMLElement
-        if (!target.closest('button') && !target.closest('input') && !target.closest('label')) {
-          onExpand(card.id)
-        }
-      }}>
-        <SearchCard
-          card={card} zone={zone}
-          faded={expandedId !== null && card.id !== expandedId}
-          dragListeners={undefined}
-          dragAttributes={undefined}
-          onExpand={() => onExpand(card.id)}
-          onDismiss={() => onDismiss(card.id)}
-          onToggleDoc={() => onToggleDoc(card.id)}
-        />
-      </div>
+      <SearchCard
+        card={card} zone={zone}
+        faded={expandedId !== null && card.id !== expandedId}
+        isDragging={isDragging}
+        dragListeners={listeners}
+        dragAttributes={attributes}
+        onExpand={() => onExpand(card.id)}
+        onDismiss={() => onDismiss(card.id)}
+        onToggleDoc={() => onToggleDoc(card.id)}
+      />
     </div>
   )
 }
@@ -87,19 +69,5 @@ export function CardGrid({ cards, zone, cols, expandedId, onReorder, onExpand, o
         </div>
       </SortableContext>
     </DndContext>
-  )
-}
-
-/* ── Grip icon ── */
-function GripIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-      <circle cx="5"  cy="4"  r="1.3"/>
-      <circle cx="11" cy="4"  r="1.3"/>
-      <circle cx="5"  cy="8"  r="1.3"/>
-      <circle cx="11" cy="8"  r="1.3"/>
-      <circle cx="5"  cy="12" r="1.3"/>
-      <circle cx="11" cy="12" r="1.3"/>
-    </svg>
   )
 }

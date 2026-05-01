@@ -4,46 +4,8 @@
   gap: 10px;
 }
 
-/* ── Per-card wrapper — stacks handle + body vertically ── */
+/* ── Per-card wrapper ── */
 .cardWrapper {
-  display: flex;
-  flex-direction: column;
   border-radius: var(--r-lg);
   overflow: hidden;
-}
-
-/* ── Drag handle strip ── */
-.dragHandle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 22px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-mid);
-  border-bottom: none;
-  border-radius: var(--r-lg) var(--r-lg) 0 0;
-  color: var(--text-3);
-  cursor: grab;
-  user-select: none;
-  transition: background 0.13s, color 0.13s;
-  flex-shrink: 0;
-}
-
-.dragHandle:hover {
-  background: var(--border);
-  color: var(--text-2);
-}
-
-/* While actively dragging */
-.dragHandleActive {
-  cursor: grabbing;
-  background: var(--border-mid);
-  color: var(--text-1);
-}
-
-/* ── Card body wrapper ── */
-.cardBody {
-  flex: 1;
-  /* pointer cursor on the wrapper so it shows through where SearchCard has no explicit cursor */
-  cursor: pointer;
 }
