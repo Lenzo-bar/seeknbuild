@@ -44,6 +44,91 @@ function detectTopic(query: string): string {
   return 'general'
 }
 
+// ── Salvage partially-truncated JSON from the API ────────────────
+// When the LLM response is cut off mid-stream, the JSON is invalid.
+// This extracts whatever complete card objects exist before the truncation.
+function salvageTruncatedJSON(text: string): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+
+  // Try to extract the cards array — grab all complete {...} objects inside it
+  const cardsStart = text.indexOf('"cards"')
+  if (cardsStart !== -1) {
+    const arrStart = text.indexOf('[', cardsStart)
+    if (arrStart !== -1) {
+      const cards: unknown[] = []
+      let depth = 0
+      let objStart = -1
+      for (let i = arrStart; i < text.length; i++) {
+        const ch = text[i]
+        if (ch === '{') { if (depth === 0) objStart = i; depth++ }
+        else if (ch === '}') {
+          depth--
+          if (depth === 0 && objStart !== -1) {
+            try {
+              cards.push(JSON.parse(text.slice(objStart, i + 1)))
+            } catch { /* skip malformed object */ }
+            objStart = -1
+          }
+        }
+        else if (ch === ']' && depth === 0) break
+      }
+      if (cards.length > 0) result.cards = cards
+    }
+  }
+
+  // Try to extract links array the same way
+  const linksStart = text.indexOf('"links"')
+  if (linksStart !== -1) {
+    const arrStart = text.indexOf('[', linksStart)
+    if (arrStart !== -1) {
+      const links: unknown[] = []
+      let depth = 0; let objStart = -1
+      for (let i = arrStart; i < text.length; i++) {
+        const ch = text[i]
+        if (ch === '{') { if (depth === 0) objStart = i; depth++ }
+        else if (ch === '}') {
+          depth--
+          if (depth === 0 && objStart !== -1) {
+            try { links.push(JSON.parse(text.slice(objStart, i + 1))) } catch { /* skip */ }
+            objStart = -1
+          }
+        }
+        else if (ch === ']' && depth === 0) break
+      }
+      if (links.length > 0) result.links = links
+    }
+  }
+
+  // Try sidebarFilters
+  const sfStart = text.indexOf('"sidebarFilters"')
+  if (sfStart !== -1) {
+    const arrStart = text.indexOf('[', sfStart)
+    if (arrStart !== -1) {
+      const items: unknown[] = []
+      let depth = 0; let objStart = -1
+      for (let i = arrStart; i < text.length; i++) {
+        const ch = text[i]
+        if (ch === '{') { if (depth === 0) objStart = i; depth++ }
+        else if (ch === '}') {
+          depth--
+          if (depth === 0 && objStart !== -1) {
+            try { items.push(JSON.parse(text.slice(objStart, i + 1))) } catch { /* skip */ }
+            objStart = -1
+          }
+        }
+        else if (ch === ']' && depth === 0) break
+      }
+      if (items.length > 0) result.sidebarFilters = items
+    }
+  }
+
+  // Try topic string
+  const topicMatch = text.match(/"topic"\s*:\s*"([^"]*)"/)
+  if (topicMatch) result.topic = topicMatch[1]
+
+  return result
+}
+
 async function callSearchAPI(query: string, searchMode: SearchMode, subMode: string): Promise<{
   cards: SearchCard[]
   links: LinkResult[]
@@ -56,14 +141,18 @@ async function callSearchAPI(query: string, searchMode: SearchMode, subMode: str
     body: JSON.stringify({ query, searchMode, subMode }),
   })
 
-  // Read as text first so we can show raw error if not JSON
+  // Read as text first so we can attempt salvage on parse failure
   const text = await res.text()
 
   let data: Record<string, unknown>
   try {
     data = JSON.parse(text)
   } catch {
-    throw new Error(`API returned non-JSON (HTTP ${res.status}): ${text.slice(0, 200)}`)
+    // JSON was truncated (LLM output too long). Try to salvage the cards array.
+    data = salvageTruncatedJSON(text)
+    if (!data) {
+      throw new Error(`API returned malformed JSON — response may have been truncated. Try a shorter or more specific query.`)
+    }
   }
 
   if (data.error) {
