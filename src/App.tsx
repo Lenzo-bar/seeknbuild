@@ -85,6 +85,8 @@ export default function App() {
   // dialogAnsweredYes = user said "Yes, keep filters" this session.
   // Stays true until a full reset or new search. Prevents re-triggering the dialog.
   const dialogAnsweredYes = useRef(false)
+  // dialogConfirmed as real state so PromptBox re-renders when it changes
+  const [dialogConfirmed, setDialogConfirmed] = useState(false)
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme])
 
@@ -100,6 +102,7 @@ export default function App() {
     setFilterResetKey(k => k + 1)
     setLockedTopic(query)
     dialogAnsweredYes.current = false
+    setDialogConfirmed(false)
     search(query, mode, sub)
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
@@ -150,13 +153,15 @@ export default function App() {
   // Mark session as confirmed. Dialog will NOT re-appear for the rest of this editing session.
   function handleDialogYes() {
     setShowTopicDialog(false)
-    dialogAnsweredYes.current = true   // ← key fix: stays true, dialog won't reopen
+    dialogAnsweredYes.current = true
+    setDialogConfirmed(true)   // triggers PromptBox re-render — Search unlocks
   }
 
   // ── Dialog: No ───────────────────────────────────────────────────
   function handleDialogNo() {
     setShowTopicDialog(false)
     dialogAnsweredYes.current = false
+    setDialogConfirmed(false)
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setFilterCat('general')
@@ -199,6 +204,7 @@ export default function App() {
     setFilterResetKey(k => k + 1)
     setLockedTopic('')
     dialogAnsweredYes.current = false
+    setDialogConfirmed(false)
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
 
@@ -206,6 +212,12 @@ export default function App() {
     ? [...webCards, ...fileCards, ...moreCards].find(c => c.id === expandedId) ?? null
     : null
   const allVisible = [...webCards, ...fileCards, ...moreCards]
+
+  // Filter link results by active chips (same keyword matching as cards)
+  const filteredLinks = activeChips.length === 0 ? linkResults : linkResults.filter(link => {
+    const text = (link.title + ' ' + link.snippet + ' ' + link.url).toLowerCase()
+    return activeChips.every(chip => text.includes(chip.value.toLowerCase()))
+  })
 
   return (
     <div className={styles.root}>
@@ -323,6 +335,7 @@ export default function App() {
             isAnalyzing={isAnalyzing} isSearching={isSearching}
             hasSearched={hasSearched}
             hasActiveFilters={activeChips.length > 0}
+            dialogConfirmed={dialogConfirmed}
             searchMode={searchMode} subMode={subMode}
             onSearch={(q, _mode, _sub) => handleSearch(q)}
             onPromptChange={handlePromptChange}
@@ -391,7 +404,7 @@ export default function App() {
             </div>
           )}
 
-          {hasLinks && <LinkZone links={linkResults} onConvert={convertLinksToCards} />}
+          {hasLinks && <LinkZone links={filteredLinks} onConvert={convertLinksToCards} />}
 
           {hasFile && (
             <>

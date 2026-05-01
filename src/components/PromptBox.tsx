@@ -9,8 +9,9 @@ interface Props {
   isAnalyzing:      boolean
   isSearching:      boolean
   hasSearched:      boolean
-  hasActiveFilters: boolean   // ← NEW: true when refinement filters are applied
-  searchMode:       SearchMode
+  hasActiveFilters:  boolean   // true when refinement filters are applied
+  dialogConfirmed:   boolean   // true after user said "Yes, keep filters" — unlocks Search
+  searchMode:        SearchMode
   subMode:          string
   onSearch:         (query: string, mode: SearchMode, sub: string) => void
   onPromptChange?:  (query: string) => void
@@ -22,7 +23,7 @@ interface Props {
 }
 
 export function PromptBox({
-  hasAny, hasWeb, hasFile, isAnalyzing, isSearching, hasSearched, hasActiveFilters,
+  hasAny, hasWeb, hasFile, isAnalyzing, isSearching, hasSearched, hasActiveFilters, dialogConfirmed,
   onPromptChange, searchMode, subMode,
   onSearch, onAnalyze, onMoreQuestion,
   onClearWeb, onClearFile, onReset,
@@ -39,8 +40,8 @@ export function PromptBox({
 
   // Search is locked when:
   // (a) already searched and user hasn't edited the prompt yet, OR
-  // (b) active filters are applied — "Apply filters" is the action, not Search
-  const searchLocked = hasSearched && (!queryEdited || hasActiveFilters)
+  // (b) active filters are applied AND user hasn't confirmed same context
+  const searchLocked = hasSearched && (!queryEdited || (hasActiveFilters && !dialogConfirmed))
 
   const canSearch  = !isFile && query.trim().length > 0 && !isSearching && !searchLocked
   const canAnalyze = isFile && !!file && !isAnalyzing
