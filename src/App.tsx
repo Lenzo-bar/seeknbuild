@@ -80,12 +80,14 @@ export default function App() {
   const [removedChipId,      setRemovedChipId]      = useState<string | null>(null)
 
   // Topic-persistence dialog
-  const [showTopicDialog,   setShowTopicDialog]   = useState(false)
-  const [lockedTopic,       setLockedTopic]       = useState('')
-  // True only during the very first search — shows skeleton. Never true for same-ctx searches.
-  const [isFirstSearch, setIsFirstSearch] = useState(false)
-  // useState (not useRef) so Search button re-renders when user answers dialog
-  const [sameCtxConfirmed, setSameCtxConfirmed] = useState(false)
+  const [showTopicDialog,    setShowTopicDialog]    = useState(false)
+  const [lockedTopic,        setLockedTopic]        = useState('')
+  const [isFirstSearch,      setIsFirstSearch]      = useState(false)
+  const [sameCtxConfirmed,   setSameCtxConfirmed]   = useState(false)
+  // Tracks whether dialog was already shown in this edit session.
+  // Resets when: user clicks Reset, answers No, or starts a new search.
+  // Prevents re-showing on every keystroke.
+  const [dialogShownThisEdit, setDialogShownThisEdit] = useState(false)
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme])
 
@@ -109,7 +111,8 @@ export default function App() {
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setLockedTopic(query)
-    setSameCtxConfirmed(false)  // cleared now; effect restores it when search completes
+    setSameCtxConfirmed(false)
+    setDialogShownThisEdit(false)  // new search = new edit session
     setIsFirstSearch(true)
     search(query, mode, sub, false)
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
@@ -118,7 +121,8 @@ export default function App() {
   // ── Same-context search — keeps filter bar, replaces cards + links ─
   function sameCtxSearch(query: string, mode: SearchMode, sub: string) {
     setLockedTopic(query)
-    setIsFirstSearch(false)         // never show skeleton — sidebar must stay intact
+    setDialogShownThisEdit(false)  // new search = new edit session
+    setIsFirstSearch(false)
     search(query, mode, sub, true)
     setExpandedId(null)
   }
@@ -138,38 +142,51 @@ export default function App() {
     }
   }
 
-  // ── Prompt onChange — show dialog on any edit once sidebar is populated ──
-  // The trigger is sameCtxConfirmed (sidebar exists), NOT activeChips.length.
-  // User must explicitly answer Yes/No before Search runs.
+  // ── Prompt onChange — show dialog ONCE per edit session ──────────
+  // Fires on first keystroke after a search. Suppressed for all subsequent
+  // keystrokes until the user answers Yes/No (or Reset clears everything).
   function handlePromptChange(q: string) {
     if (
       hasSearched &&
-      sameCtxConfirmed &&
       !showTopicDialog &&
+      !dialogShownThisEdit &&   // ← key: only show once per edit session
       q.trim().length > 0 &&
       q !== lockedTopic
     ) {
       setShowTopicDialog(true)
-      // Temporarily pause sameCtxConfirmed so Search waits for dialog answer
-      setSameCtxConfirmed(false)
+      setDialogShownThisEdit(true)  // suppress for all subsequent keystrokes
+      setSameCtxConfirmed(false)    // pause — Search waits for Yes/No
     }
   }
 
-  // ── Dialog: Yes — keep sidebar, user clicks Search normally ──────
+  // ── Dialog: Yes — keep sidebar for this session ──────────────────
   function handleDialogYes() {
     setShowTopicDialog(false)
-    setSameCtxConfirmed(true)   // restore protection → Search will use sameCtxSearch
+    setSameCtxConfirmed(true)      // Search uses sameCtxSearch
+    setDialogShownThisEdit(true)   // don't show again this session
   }
 
-  // ── Dialog: No — clear filters, user then clicks Search fresh ─────
+  // ── Dialog: No — clear sidebar, fresh search path ────────────────
   function handleDialogNo() {
     setShowTopicDialog(false)
     setSameCtxConfirmed(false)
+    setDialogShownThisEdit(false)  // reset so next edit session shows dialog again
     setActiveChips([])
     setFilterResetKey(k => k + 1)
     setFilterCat('general')
     setLockedTopic('')
     clientRefine([])
+  }
+
+  // ── Dialog: X (neutral close) — dismiss without answering ────────
+  // dialogShownThisEdit stays true → no re-show on next keystroke.
+  // sameCtxConfirmed stays false → Search will show dialog again if clicked.
+  // Next time user edits prompt from scratch, dialog will reappear.
+  function handleDialogDismiss() {
+    setShowTopicDialog(false)
+    // Don't change sameCtxConfirmed or dialogShownThisEdit —
+    // neutral means "ask me again next time I edit"
+    setDialogShownThisEdit(false)
   }
 
   useEffect(() => {
@@ -207,6 +224,7 @@ export default function App() {
     setFilterResetKey(k => k + 1)
     setLockedTopic('')
     setSameCtxConfirmed(false)
+    setDialogShownThisEdit(false)
     setIsFirstSearch(false)
     setFilterCat('general')
     setShowTopicDialog(false)
@@ -266,7 +284,25 @@ export default function App() {
             width: '90vw',
             boxShadow: 'var(--shadow-overlay)',
             display: 'flex', flexDirection: 'column', gap: 16,
+            position: 'relative',
           }}>
+            {/* ── X close button — neutral dismiss ── */}
+            <button
+              onClick={handleDialogDismiss}
+              title="Dismiss — ask me again next time"
+              style={{
+                position: 'absolute', top: 12, right: 12,
+                width: 28, height: 28,
+                borderRadius: 'var(--r-sm)',
+                border: '1px solid var(--border)',
+                background: 'transparent',
+                color: 'var(--text-3)',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 16, lineHeight: 1,
+              }}
+            >×</button>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 24 }}>🔎</span>
               <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', lineHeight: 1.3 }}>
@@ -275,7 +311,7 @@ export default function App() {
             </div>
 
             <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
-              You've edited your prompt while refinement filters are active.
+              You've edited your prompt while the refinement bar is active.
               Are you still searching about the same subject?
             </p>
 
@@ -292,8 +328,9 @@ export default function App() {
             )}
 
             <p style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.6 }}>
-              <strong style={{ color: 'var(--text-2)' }}>Yes</strong> — keep the refinement bar and active filters as-is.<br />
-              <strong style={{ color: 'var(--text-2)' }}>No</strong> — this is a new topic; clear all filters and start fresh.
+              <strong style={{ color: 'var(--text-2)' }}>Yes</strong> — keep the refinement bar for this session.<br />
+              <strong style={{ color: 'var(--text-2)' }}>No</strong> — new topic; clear all filters and start fresh.<br />
+              <strong style={{ color: 'var(--text-2)' }}>✕</strong> — ask me again next time I edit.
             </p>
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
