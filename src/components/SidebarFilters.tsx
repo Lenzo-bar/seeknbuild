@@ -15,9 +15,9 @@ interface Props {
   category:           FilterCategory
   topic:              string
   sections:           SidebarFilterSection[]
-  isSearching:        boolean
-  resetKey:           number   // full reset — wipes everything
-  locationRefreshKey: number   // partial reset — only location sections
+  isFirstSearch:      boolean   // true only during the very first search — shows skeleton
+  resetKey:           number    // full reset — wipes everything (fresh search only)
+  locationRefreshKey: number
   removedChipId:      string | null
   onRefine:           (chips: ActiveFilterChip[]) => void
   onApply:            (chips: ActiveFilterChip[]) => void
@@ -81,9 +81,10 @@ function buildAcademiaChips(
 }
 
 // ── Academia panel ────────────────────────────────────────────────
-function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
+function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply, resetKey }: {
   topic: string
   removedChipId: string | null
+  resetKey: number
   onChipsChange: (chips: ActiveFilterChip[]) => void
   onApply: (chips: ActiveFilterChip[]) => void
 }) {
@@ -97,7 +98,8 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
   const [secA,   setSecA]   = useState('')
   const [secB,   setSecB]   = useState('')
 
-  useEffect(() => { setChecks({}); setLevel(''); setSecA(''); setSecB('') }, [topic])
+  // Full wipe on fresh search (resetKey bump) or topic change
+  useEffect(() => { setChecks({}); setLevel(''); setSecA(''); setSecB('') }, [resetKey, topic])
 
   useEffect(() => {
     if (!removedChipId) return
@@ -172,11 +174,12 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply }: {
 }
 
 // ── Buying/Selling panel ──────────────────────────────────────────
-function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onApply, locationRefreshKey }: {
+function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onApply, locationRefreshKey, resetKey }: {
   topic:              string
   sections:           SidebarFilterSection[]
   removedChipId:      string | null
   locationRefreshKey: number
+  resetKey:           number
   onChipsChange:      (chips: ActiveFilterChip[]) => void
   onApply:            (chips: ActiveFilterChip[]) => void
 }) {
@@ -185,8 +188,8 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
   const [values,    setValues]    = useState<Record<string, unknown>>({})
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
-  // Full reset when topic changes
-  useEffect(() => { setValues({}) }, [topic])
+  // Full reset on fresh search (resetKey bump) or topic change
+  useEffect(() => { setValues({}) }, [resetKey, topic])
 
   // Partial reset: only clear location-related section values when location changes
   useEffect(() => {
@@ -338,11 +341,12 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
 
 // ── Main export ───────────────────────────────────────────────────
 export function SidebarFilters({
-  category, topic, sections, isSearching,
+  category, topic, sections, isFirstSearch,
   resetKey, locationRefreshKey, removedChipId, onRefine, onApply
 }: Props) {
   const [chips, setChips] = useState<ActiveFilterChip[]>([])
 
+  // Only wipe chips display on full reset
   useEffect(() => { setChips([]) }, [resetKey])
 
   function handleChips(incoming: ActiveFilterChip[]) {
@@ -364,21 +368,22 @@ export function SidebarFilters({
         )}
       </div>
 
-      {isSearching ? (
+      {/* Skeleton only on the very first search — never during same-context re-searches */}
+      {isFirstSearch ? (
         category === 'academia' ? <SkeletonAcademia /> : <SkeletonBuying />
       ) : category === 'academia' ? (
         <AcademiaPanel
-          key={`acad-${resetKey}`}
           topic={topic}
+          resetKey={resetKey}
           removedChipId={removedChipId}
           onChipsChange={handleChips}
           onApply={onApply}
         />
       ) : (
         <BuyingSellingPanel
-          key={`buy-${resetKey}`}
           topic={topic}
           sections={sections}
+          resetKey={resetKey}
           removedChipId={removedChipId}
           locationRefreshKey={locationRefreshKey}
           onChipsChange={handleChips}

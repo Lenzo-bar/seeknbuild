@@ -81,14 +81,21 @@ export default function App() {
   // Topic-persistence dialog
   const [showTopicDialog,   setShowTopicDialog]   = useState(false)
   const [lockedTopic,       setLockedTopic]       = useState('')
+  // True only during the very first search — shows skeleton. Never true for same-ctx searches.
+  const [isFirstSearch, setIsFirstSearch] = useState(false)
   // useState (not useRef) so Search button re-renders when user answers dialog
-  const [sameCtxConfirmed,  setSameCtxConfirmed]  = useState(false)
+  const [sameCtxConfirmed, setSameCtxConfirmed] = useState(false)
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme) }, [theme])
 
   function handleModeChange(mode: SearchMode, sub = '') {
     setSearchMode(mode); setSubMode(sub)
   }
+
+  // Clear isFirstSearch (skeleton) once search finishes
+  useEffect(() => {
+    if (!isSearching) setIsFirstSearch(false)
+  }, [isSearching])
 
   // ── Fresh search — wipes filter bar ──────────────────────────────
   function freshSearch(query: string, mode: SearchMode, sub: string) {
@@ -97,14 +104,16 @@ export default function App() {
     setFilterResetKey(k => k + 1)
     setLockedTopic(query)
     setSameCtxConfirmed(false)
-    search(query, mode, sub, false)   // keepFilters = false → sidebar resets
+    setIsFirstSearch(true)          // show skeleton during this search only
+    search(query, mode, sub, false)
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
 
   // ── Same-context search — keeps filter bar, replaces cards + links ─
   function sameCtxSearch(query: string, mode: SearchMode, sub: string) {
     setLockedTopic(query)
-    search(query, mode, sub, true)    // keepFilters = true → sidebar untouched
+    setIsFirstSearch(false)         // never show skeleton — sidebar must stay intact
+    search(query, mode, sub, true)
     setExpandedId(null)
   }
 
@@ -186,6 +195,7 @@ export default function App() {
     setFilterResetKey(k => k + 1)
     setLockedTopic('')
     setSameCtxConfirmed(false)
+    setIsFirstSearch(false)
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
 
@@ -299,7 +309,7 @@ export default function App() {
             category={filterCat}
             topic={currentTopic || ''}
             sections={sidebarFilters}
-            isSearching={isSearching}
+            isFirstSearch={isFirstSearch}
             resetKey={filterResetKey}
             locationRefreshKey={locationRefreshKey}
             removedChipId={removedChipId}
