@@ -333,7 +333,6 @@ export function DocumentModal({ cards, onClose }: Props) {
           {[
             { fmt: 'md',   icon: '📄', label: 'Markdown' },
             { fmt: 'html', icon: '🌐', label: 'HTML' },
-            { fmt: 'docx', icon: '📝', label: 'Word (.docx)' },
             { fmt: 'pdf',  icon: '🖨', label: 'PDF' },
           ].map(({ fmt, icon, label }) => (
             <button
@@ -345,6 +344,16 @@ export function DocumentModal({ cards, onClose }: Props) {
               {exporting === fmt ? <span className={styles.spinner} /> : icon} {label}
             </button>
           ))}
+
+          {/* Word export — disabled: PDF can be opened in Word/Google Docs locally */}
+          <button
+            className={styles.actionBtn}
+            disabled
+            title="Coming soon — PDF files can be opened directly in Word or Google Docs"
+            style={{ opacity: 0.38, cursor: 'not-allowed', textDecoration: 'line-through' }}
+          >
+            📝 Word (.docx)
+          </button>
 
           <button className={styles.printBtn} onClick={() => window.print()} disabled={exporting !== null}>
             🖨 Print
