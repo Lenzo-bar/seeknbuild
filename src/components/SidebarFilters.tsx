@@ -119,7 +119,10 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply, resetKey 
   const hasPending = Object.values(checks).some(Boolean) || !!level || !!secA || !!secB
 
   return (
-    <div className={styles.body}>
+    <div className={styles.body}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).classList.add(styles.scrollVisible)}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).classList.remove(styles.scrollVisible)}
+    >
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Primary filters</div>
         <div className={styles.sectionBody}>
@@ -267,7 +270,10 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
   const hasPending = buildChips().length > 0
 
   return (
-    <div className={styles.body}>
+    <div className={styles.body}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).classList.add(styles.scrollVisible)}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).classList.remove(styles.scrollVisible)}
+    >
       {displaySections.map(sec => {
         const isLocationSec = LOCATION_SECTION_IDS.has(sec.id)
         return (

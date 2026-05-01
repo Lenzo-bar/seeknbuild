@@ -55,7 +55,10 @@ export function SearchCard({
       <div className={styles.cardContent} onClick={e => {
         const target = e.target as HTMLElement
         if (!target.closest('button') && !target.closest('input') && !target.closest('label')) onExpand()
-      }}>
+      }}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).classList.add(styles.scrollVisible)}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).classList.remove(styles.scrollVisible)}
+      >
 
         <div className={styles.header}>
           <span className={`${styles.rank} ${rankClass}`}>#{card.rank}</span>

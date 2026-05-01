@@ -18,7 +18,10 @@ export function SummaryBanner({ card, onExpand, onDismiss, onToggleDoc }: Props)
       </div>
 
       {/* ── Main content ── */}
-      <div className={styles.body} onClick={e => {
+      <div className={styles.body}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).classList.add(styles.scrollVisible)}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).classList.remove(styles.scrollVisible)}
+        onClick={e => {
         const target = e.target as HTMLElement
         if (!target.closest('button') && !target.closest('input') && !target.closest('label')) onExpand()
       }}>
