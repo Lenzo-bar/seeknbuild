@@ -6,6 +6,7 @@ import { ActiveFilterChips }  from './components/ActiveFilterChips'
 import { DocBar }             from './components/DocBar'
 import { Toolbar }            from './components/Toolbar'
 import { CardGrid }           from './components/CardGrid'
+import { SummaryBanner }      from './components/SummaryBanner'
 import { CardExpandOverlay }  from './components/CardExpandOverlay'
 import { DocumentModal }      from './components/DocumentModal'
 import { MoreQuestionPanel }  from './components/MoreQuestionPanel'
@@ -204,6 +205,10 @@ export default function App() {
     : null
   const allVisible = [...webCards, ...fileCards, ...moreCards]
 
+  // Card #0 is the AI summary — rendered as a full-width banner above the grid
+  const summaryCard = webCards.find(c => c.rank === 0) ?? null
+  const gridCards   = webCards.filter(c => c.rank !== 0)
+
   // Filter link results by active chips — mirrors card filtering
   const filteredLinks = activeChips.length === 0 ? linkResults : linkResults.filter(link => {
     const text = (link.title + ' ' + link.snippet + ' ' + link.url).toLowerCase()
@@ -385,8 +390,19 @@ export default function App() {
 
           {hasWeb && (
             <div className={styles.zone}>
-              <ZoneLabel color="web" label="Web + LLM results" count={webCards.length} />
-              <CardGrid cards={webCards} zone="web" cols={cols} expandedId={expandedId}
+              <ZoneLabel color="web" label="Web + LLM results" count={gridCards.length} />
+
+              {/* ── Card #0 — AI summary banner, full width above grid ── */}
+              {summaryCard && summaryCard.visible && (
+                <SummaryBanner
+                  card={summaryCard}
+                  onExpand={() => { setExpandedId(p => p === summaryCard.id ? null : summaryCard.id); setExpandedZone('web') }}
+                  onDismiss={() => dismissCard(summaryCard.id, 'web')}
+                  onToggleDoc={() => toggleDocSelect(summaryCard.id, 'web')}
+                />
+              )}
+
+              <CardGrid cards={gridCards} zone="web" cols={cols} expandedId={expandedId}
                 onReorder={reorderCards}
                 onExpand={id => { setExpandedId(p => p===id?null:id); setExpandedZone('web') }}
                 onDismiss={id => dismissCard(id,'web')}
