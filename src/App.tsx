@@ -197,6 +197,8 @@ export default function App() {
     setLockedTopic('')
     setSameCtxConfirmed(false)
     setIsFirstSearch(false)
+    setFilterCat('general')
+    setShowTopicDialog(false)
     setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
   }
 
