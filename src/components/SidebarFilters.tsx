@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { FilterCategory, ActiveFilterChip } from '../types'
 import type { SidebarFilterSection } from '../types'
-import {
-  ACADEMIA_PRIMARIES, ACADEMIA_LEVELS,
-  ACADEMIA_SECONDARY_A, ACADEMIA_SECONDARY_B,
-  BUYING_SELLING_FILTERS,
-} from '../data/filterCategories'
+import { ACADEMIA_LEVELS, ACADEMIA_PRIMARIES, ACADEMIA_SECONDARY_A, ACADEMIA_SECONDARY_B, BUYING_SELLING_FILTERS, getFilterCategory } from '../data/filterCategories'
 import styles from './SidebarFilters.module.css'
 
 // Section IDs that are location-related (only these reset on location change)
