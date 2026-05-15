@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { PromptBox }          from './components/PromptBox'
 import { SearchModeBar }      from './components/SearchModeBar'
 import { SidebarFilters }     from './components/SidebarFilters'
@@ -85,7 +85,7 @@ export default function App() {
     fileCards, fileSummaryTable, fileCardGroups, isAnalyzing, hasAnalyzed, analyzeTime,
     webOnlyCards, webOnlyLinks, hasWebOnlySearched, isWebOnlySearching, webOnlySearchTime,
     urlCards, urlSummaryTable, isUrlAnalyzing, hasUrlAnalyzed, urlAnalyzeTime, lastUrlTask,
-    linkResults, sidebarFilters, apiError,
+    linkResults, sidebarFilters, setSidebarFilters, apiError,
     hasWeb, hasLlm, hasFile, hasWebOnly, hasUrls, hasMore, hasLinks, hasAny,
     isSearching, hasSearched, currentTopic,
     isFiltering, searchTime, filterTime, totalCards,
@@ -128,9 +128,11 @@ export default function App() {
   function handleMultiLlmSearch() {
     const q = currentQueryRef
     if (!q.trim() || selectedLlms.size === 0) return
-    // Save to history
     promptHistory.addEntry(q, 'llm')
-    // Fire each selected provider
+    if (!sessionTopic) setSessionTopic(q)
+    setSessionHasSearched(true)
+    // keepFilters=false on first search so sidebar gets populated from provider response
+    const keepFilters = llmMulti.activeSlots.length > 0 && sessionHasSearched
     for (const pid of selectedLlms) {
       const prevSummary = hasLlmSearched
         ? llmCards.find(c => c.rank === 0)?.snippet ?? ''
@@ -206,8 +208,18 @@ export default function App() {
   // ── Effects ───────────────────────────────────────────────────────────────
   useEffect(()=>{ document.documentElement.setAttribute('data-theme', theme) },[theme])
   useEffect(()=>{ if(!isSearching&&hasSearched){setIsFirstSearch(false);setSameCtxOk(true)} },[isSearching,hasSearched])
-  useEffect(()=>{ if(currentTopic)setFilterCat(getFilterCategory(currentTopic)) },[currentTopic])
+  useEffect(()=>{ 
+    if(currentTopic && !hasLlmSearched) setFilterCat(getFilterCategory(currentTopic)) 
+  },[currentTopic])
+      
   useEffect(()=>{ if(!hasWeb){setWebGrpId(null);setWebGrpOn(false)} },[hasWeb])
+  // Apply sidebar filters from multi-LLM slot when search completes
+  useEffect(() => {
+    if (!llmMulti.isAnyLoading && llmMulti.latestSidebarFilters.length > 0) {
+      setSidebarFilters(llmMulti.latestSidebarFilters)
+    }
+  }, [llmMulti.isAnyLoading, llmMulti.latestSidebarFilters])
+
   // LLM multi: switch to llm tab only when loading transitions from true→false (search just completed)
   // Do NOT watch activeSlots array directly — it's a new reference every render and causes infinite loops
   const prevLlmLoadingRef = useRef(false)
@@ -253,15 +265,42 @@ export default function App() {
   function handleAppendYes(){ setShowAppendDlg(false); sameCtxOk?sameSearch(pendingQ,pendingM,pendingS,true):freshSearch(pendingQ,pendingM,pendingS,true) }
   function handleAppendNo(){  setShowAppendDlg(false); sameCtxOk?sameSearch(pendingQ,pendingM,pendingS,false):freshSearch(pendingQ,pendingM,pendingS,false) }
 
+  /*
+
   function fireLlm(query: string) {
+    promptHistory.addEntry(query, 'llm')
+    if (!sessionTopic) setSessionTopic(query)
+    setSessionHasSearched(true)
+    // keepFilters=false on first LLM search so sidebar gets populated from API response.
+    // keepFilters=true on subsequent same-topic searches so user's filters persist.
+    const keepFilters = hasLlmSearched && sessionHasSearched
     setActiveTab('llm')
-    llmSearch(query, hasLlmSearched ? (llmCards.find(c=>c.rank===0)?.snippet??'') : '', true)
+    llmSearch(query, hasLlmSearched ? (llmCards.find(c=>c.rank===0)?.snippet??'') : '', keepFilters)
     setExpandedId(null)
   }
-  function fireWebOnly(query: string) {
-    promptHistory.addEntry(query, 'webonly')   // ← ① save to history
+
+  */
+
+  function fireLlm(query: string) {
+    console.log('🔥 fireLlm called, query:', query)   // ← ADD THIS
+    promptHistory.addEntry(query, 'llm')
     if (!sessionTopic) setSessionTopic(query)
-    webonlySearch(query, true)
+    setSessionHasSearched(true)
+    const keepFilters = hasLlmSearched && sessionHasSearched
+    console.log('🔥 keepFilters:', keepFilters)        // ← ADD THIS
+    setActiveTab('llm')
+    llmSearch(query, hasLlmSearched ? (llmCards.find(c=>c.rank===0)?.snippet??'') : '', keepFilters)
+    setExpandedId(null)
+  }
+
+  function fireWebOnly(query: string) {
+    promptHistory.addEntry(query, 'webonly')
+    if (!sessionTopic) setSessionTopic(query)
+    setSessionHasSearched(true)
+    // keepFilters=false on first Web Only search so sidebar updates from results.
+    // keepFilters=true on repeat searches about the same topic.
+    const keepFilters = hasWebOnlySearched && sessionHasSearched
+    webonlySearch(query, keepFilters)
     setExpandedId(null)
   }
 
@@ -299,8 +338,7 @@ export default function App() {
     const isDrift = hasAny && sessionTopic && activeChips.length > 0
 
     if (appMode === 'llm') {
-      // Multi-LLM: search fires via handleMultiLlmSearch from PromptBox
-      // but handleSearch is also called for backward compat — ignore here
+      fireLlm(enrichQuery(query))
       return
     }
     if (appMode === 'file') return
@@ -315,7 +353,9 @@ export default function App() {
         setLockedTopic(query)
         setShowTopicDlg(true)
       } else {
-        fireWebOnly(enrichQuery(query))
+        // Send the raw query — do NOT enrich with old session topic when switching modes.
+        // enrichQuery() would append the previous LLM topic context, causing wrong results.
+        fireWebOnly(query)
       }
       return
     }
@@ -403,23 +443,24 @@ export default function App() {
       else{setName(undefined);setId(id);setOn(true)}
     }
   }
-  const handleWebGroup  = mkGroupHandler(setWebGrpId,  setWebGrpOn,  setWebGrpName)
-  const handleLlmGroup  = mkGroupHandler(setLlmGrpId,  setLlmGrpOn,  setLlmGrpName)
-  const handleFileGroup = mkGroupHandler(setFileGrpId,  setFileGrpOn,  setFileGrpName)
-  const handleWoGroup   = mkGroupHandler(setWoGrpId,    setWoGrpOn,    setWoGrpName)
-  const handleUrlGroup  = mkGroupHandler(setUrlGrpId,   setUrlGrpOn,   setUrlGrpName)
-  const handleAllGroup  = mkGroupHandler(setAllGrpId,   setAllGrpOn,   setAllGrpName)
+  const handleWebGroup  = useCallback(mkGroupHandler(setWebGrpId,  setWebGrpOn,  setWebGrpName),  [])
+  const handleLlmGroup  = useCallback(mkGroupHandler(setLlmGrpId,  setLlmGrpOn,  setLlmGrpName),  [])
+  const handleFileGroup = useCallback(mkGroupHandler(setFileGrpId, setFileGrpOn, setFileGrpName), [])
+  const handleWoGroup   = useCallback(mkGroupHandler(setWoGrpId,   setWoGrpOn,   setWoGrpName),   [])
+  const handleUrlGroup  = useCallback(mkGroupHandler(setUrlGrpId,  setUrlGrpOn,  setUrlGrpName),  [])
+  const handleAllGroup  = useCallback(mkGroupHandler(setAllGrpId,  setAllGrpOn,  setAllGrpName),  [])
 
   // ── Groups ────────────────────────────────────────────────────────────────
-  const webGroups:CardGroupOption[]  = [...cardGroups,   ...(webGrpName ?[{id:`custom:${webGrpName}`, label:`By "${webGrpName}"`, description:'Custom',subItems:[],cardKeyword:webGrpName.toLowerCase()}] :[])]
-  const llmGroups:CardGroupOption[]  = [...llmCardGroups,...(llmGrpName ?[{id:`custom:${llmGrpName}`, label:`By "${llmGrpName}"`, description:'Custom',subItems:[],cardKeyword:llmGrpName.toLowerCase()}] :[])]
-  const fileGroups:CardGroupOption[] = [...fileCardGroups,...(fileGrpName?[{id:`custom:${fileGrpName}`,label:`By "${fileGrpName}"`,description:'Custom',subItems:[],cardKeyword:fileGrpName.toLowerCase()}]:[])]
-  const woGroups:CardGroupOption[]   = FALLBACK_GROUPS.concat(woGrpName?[{id:`custom:${woGrpName}`,label:`By "${woGrpName}"`,description:'Custom',subItems:[],cardKeyword:woGrpName.toLowerCase()}]:[])
-  const urlGroups:CardGroupOption[]  = [
-    {id:'domain',label:'By domain',description:'Group by website domain',subItems:[],cardKeyword:'domain'},
-    {id:'task',  label:'By task',  description:'Group by analysis task', subItems:[],cardKeyword:'task'},
-    ...(urlGrpName?[{id:`custom:${urlGrpName}`,label:`By "${urlGrpName}"`,description:'Custom',subItems:[],cardKeyword:urlGrpName.toLowerCase()}]:[]),
-  ]
+  const webGroups  = useMemo(() => [...cardGroups,    ...(webGrpName  ? [{id:`custom:${webGrpName}`,  label:`By "${webGrpName}"`,  description:'Custom', subItems:[], cardKeyword:webGrpName.toLowerCase()}]  : [])], [cardGroups,    webGrpName])
+  const llmGroups  = useMemo(() => [...llmCardGroups, ...(llmGrpName  ? [{id:`custom:${llmGrpName}`,  label:`By "${llmGrpName}"`,  description:'Custom', subItems:[], cardKeyword:llmGrpName.toLowerCase()}]  : [])], [llmCardGroups, llmGrpName])
+  const fileGroups = useMemo(() => [...fileCardGroups,...(fileGrpName  ? [{id:`custom:${fileGrpName}`, label:`By "${fileGrpName}"`, description:'Custom', subItems:[], cardKeyword:fileGrpName.toLowerCase()}] : [])], [fileCardGroups,fileGrpName])
+  const woGroups   = useMemo(() => FALLBACK_GROUPS.concat(woGrpName   ? [{id:`custom:${woGrpName}`,   label:`By "${woGrpName}"`,   description:'Custom', subItems:[], cardKeyword:woGrpName.toLowerCase()}]   : []), [woGrpName])
+  const urlGroups  = useMemo(() => [
+    {id:'domain', label:'By domain', description:'Group by website domain', subItems:[], cardKeyword:'domain'},
+    {id:'task',   label:'By task',   description:'Group by analysis task',  subItems:[], cardKeyword:'task'},
+    ...(urlGrpName ? [{id:`custom:${urlGrpName}`, label:`By "${urlGrpName}"`, description:'Custom', subItems:[], cardKeyword:urlGrpName.toLowerCase()}] : []),
+  ], [urlGrpName])
+
   const allGroupsSeen = new Set<string>()
   const allGroups:CardGroupOption[] = [
     ...[...cardGroups,...llmCardGroups,...fileCardGroups,...FALLBACK_GROUPS].filter(g=>{ if(allGroupsSeen.has(g.id))return false; allGroupsSeen.add(g.id); return true }),
