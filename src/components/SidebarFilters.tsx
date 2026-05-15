@@ -1,18 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { FilterCategory, ActiveFilterChip } from '../types'
 import type { SidebarFilterSection } from '../types'
 import { ACADEMIA_LEVELS, ACADEMIA_PRIMARIES, ACADEMIA_SECONDARY_A, ACADEMIA_SECONDARY_B, BUYING_SELLING_FILTERS, getFilterCategory } from '../data/filterCategories'
 import styles from './SidebarFilters.module.css'
 
-// Section IDs that are location-related (only these reset on location change)
 const LOCATION_SECTION_IDS = new Set(['region', 'city', 'location', 'area', 'zone', 'neighborhood', 'district'])
 
 interface Props {
   category:           FilterCategory
   topic:              string
   sections:           SidebarFilterSection[]
-  isFirstSearch:      boolean   // true only during the very first search — shows skeleton
-  resetKey:           number    // full reset — wipes everything (fresh search only)
+  appendedSections?:  SidebarFilterSection[]
+  isFirstSearch:      boolean
+  resetKey:           number
   locationRefreshKey: number
   removedChipId:      string | null
   onRefine:           (chips: ActiveFilterChip[]) => void
@@ -94,7 +94,6 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply, resetKey 
   const [secA,   setSecA]   = useState('')
   const [secB,   setSecB]   = useState('')
 
-  // Full wipe on fresh search (resetKey bump) or topic change
   useEffect(() => { setChecks({}); setLevel(''); setSecA(''); setSecB('') }, [resetKey, topic])
 
   useEffect(() => {
@@ -110,7 +109,7 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply, resetKey 
 
   useEffect(() => {
     onChipsChange(buildAcademiaChips(checks, level, secA, secB))
-  }, [checks, level, secA, secB, onChipsChange])
+  }, [checks, level, secA, secB]) // intentionally omitting onChipsChange — it's stable via useCallback in parent
 
   const hasPending = Object.values(checks).some(Boolean) || !!level || !!secA || !!secB
 
@@ -170,51 +169,45 @@ function AcademiaPanel({ topic, onChipsChange, removedChipId, onApply, resetKey 
 }
 
 // ── Buying/Selling panel ──────────────────────────────────────────
-function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onApply, locationRefreshKey, resetKey }: {
+function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId,
+  locationRefreshKey, resetKey, labelPrefix = '' }: {
   topic:              string
   sections:           SidebarFilterSection[]
   removedChipId:      string | null
   locationRefreshKey: number
   resetKey:           number
+  labelPrefix?:       string
   onChipsChange:      (chips: ActiveFilterChip[]) => void
-  onApply:            (chips: ActiveFilterChip[]) => void
 }) {
   const topicKey = Object.keys(BUYING_SELLING_FILTERS).find(k => topic.includes(k)) || 'general'
   const displaySections = sections.length > 0 ? sections : BUYING_SELLING_FILTERS[topicKey] || BUYING_SELLING_FILTERS.general
   const [values,    setValues]    = useState<Record<string, unknown>>({})
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
-  // Full reset on fresh search (resetKey bump) or topic change
   useEffect(() => { setValues({}) }, [resetKey, topic])
 
-  // Partial reset: only clear location-related section values when location changes
   useEffect(() => {
     if (locationRefreshKey === 0) return
     setValues(prev => {
       const next = { ...prev }
       displaySections.forEach(sec => {
-        if (LOCATION_SECTION_IDS.has(sec.id)) {
-          delete next[sec.id]
-        }
+        if (LOCATION_SECTION_IDS.has(sec.id)) delete next[sec.id]
       })
       return next
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationRefreshKey])
 
-  // Sync when chip is individually removed
   useEffect(() => {
     if (!removedChipId) return
     setValues(prev => {
       const next = { ...prev }
-      if (next[removedChipId] !== undefined) {
-        delete next[removedChipId]
-        return next
-      }
-      const dashIdx = removedChipId.lastIndexOf('-')
+      const strippedId = removedChipId.startsWith(labelPrefix) ? removedChipId.slice(labelPrefix.length) : removedChipId
+      if (next[strippedId] !== undefined) { delete next[strippedId]; return next }
+      const dashIdx = strippedId.lastIndexOf('-')
       if (dashIdx > 0) {
-        const secId = removedChipId.slice(0, dashIdx)
-        const opt   = removedChipId.slice(dashIdx + 1)
+        const secId = strippedId.slice(0, dashIdx)
+        const opt   = strippedId.slice(dashIdx + 1)
         if (next[secId] && typeof next[secId] === 'object') {
           next[secId] = { ...(next[secId] as Record<string,boolean>), [opt]: false }
           return next
@@ -222,7 +215,7 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
       }
       return prev
     })
-  }, [removedChipId])
+  }, [removedChipId, labelPrefix])
 
   function buildChips(): ActiveFilterChip[] {
     const chips: ActiveFilterChip[] = []
@@ -231,25 +224,24 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
       if (!v) return
       if (sec.type === 'checkboxes' && typeof v === 'object') {
         Object.entries(v as Record<string,boolean>).forEach(([opt, on]) => {
-          if (on) chips.push({ id: `${sec.id}-${opt}`, label: sec.label, value: opt, category: 'buying-selling' })
+          if (on) chips.push({ id: `${labelPrefix}${sec.id}-${opt}`, label: sec.label, value: opt, category: 'buying-selling' })
         })
       } else if (sec.type === 'radio' || sec.type === 'select') {
-        if (v) chips.push({ id: sec.id, label: sec.label, value: String(v), category: 'buying-selling' })
+        if (v) chips.push({ id: `${labelPrefix}${sec.id}`, label: sec.label, value: String(v), category: 'buying-selling' })
       } else if (sec.type === 'range') {
         const r = v as { min?: string; max?: string }
         if (r.min || r.max) {
           const val = [r.min && `${sec.unit||''}${r.min}`, r.max && `${sec.unit||''}${r.max}`].filter(Boolean).join(' – ')
-          chips.push({ id: sec.id, label: sec.label, value: val, category: 'buying-selling' })
+          chips.push({ id: `${labelPrefix}${sec.id}`, label: sec.label, value: val, category: 'buying-selling' })
         }
       }
     })
     return chips
   }
 
-  useEffect(() => {
-    onChipsChange(buildChips())
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values, displaySections])
+  // FIX: only depend on `values` — not `displaySections` (new array ref every render)
+  // and not `onChipsChange` (stabilised via useCallback in parent)
+  useEffect(() => { onChipsChange(buildChips()) }, [values]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function setCheck(secId: string, opt: string, checked: boolean) {
     setValues(prev => ({ ...prev, [secId]: { ...((prev[secId] as Record<string,boolean>) || {}), [opt]: checked } }))
@@ -260,19 +252,16 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
     setValues(prev => ({ ...prev, [secId]: { ...((prev[secId] as Record<string,string>) || {}), [which]: val } }))
   }
 
-  const hasPending = buildChips().length > 0
-
   return (
-    <div className={styles.body}>
+    <div>
       {displaySections.map(sec => {
         const isLocationSec = LOCATION_SECTION_IDS.has(sec.id)
         return (
-          <div key={sec.id} className={styles.section}>
+          <div key={`${labelPrefix}${sec.id}`} className={styles.section}>
             <button className={styles.sectionHeader}
               onClick={() => setCollapsed(p => ({ ...p, [sec.id]: !p[sec.id] }))}>
               <span className={styles.sectionLabel}>
                 {sec.label}
-                {/* Small indicator on location sections so user can see they're location-aware */}
                 {isLocationSec && <span style={{ marginLeft: 5, fontSize: 10, color: 'var(--teal)', fontWeight: 500 }}>📍</span>}
               </span>
               <svg className={`${styles.chevron} ${collapsed[sec.id] ? styles.chevronCollapsed : ''}`}
@@ -293,7 +282,7 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
                 ))}
                 {sec.type === 'radio' && sec.options?.map(opt => (
                   <label key={opt} className={styles.checkItem}>
-                    <input type="radio" name={sec.id} className={styles.checkbox}
+                    <input type="radio" name={`${labelPrefix}${sec.id}`} className={styles.checkbox}
                       checked={values[sec.id] === opt}
                       onChange={() => setRadio(sec.id, opt)} />
                     <span className={styles.checkLabel}>{opt}</span>
@@ -324,33 +313,34 @@ function BuyingSellingPanel({ topic, sections, onChipsChange, removedChipId, onA
           </div>
         )
       })}
-
-      <button
-        className={styles.applyBtn}
-        onClick={() => onApply(buildChips())}
-      >
-        {hasPending ? '✓ Apply filters' : '↩ Revert to previous results'}
-      </button>
     </div>
   )
 }
 
 // ── Main export ───────────────────────────────────────────────────
 export function SidebarFilters({
-  category, topic, sections, isFirstSearch,
-  resetKey, locationRefreshKey, removedChipId, onRefine, onApply
+  category, topic, sections, appendedSections = [],
+  isFirstSearch, resetKey, locationRefreshKey, removedChipId, onRefine, onApply
 }: Props) {
-  const [chips, setChips] = useState<ActiveFilterChip[]>([])
+  const [initialChips,  setInitialChips]  = useState<ActiveFilterChip[]>([])
+  const [appendedChips, setAppendedChips] = useState<ActiveFilterChip[]>([])
 
-  // Only wipe chips display on full reset
-  useEffect(() => { setChips([]) }, [resetKey])
+  useEffect(() => { setInitialChips([]); setAppendedChips([]) }, [resetKey])
 
-  function handleChips(incoming: ActiveFilterChip[]) {
-    setChips(incoming)
-    onRefine(incoming)
-  }
+  // FIX: useCallback so these don't get recreated on every render,
+  // which was causing BuyingSellingPanel's useEffect to loop infinitely
+  const handleInitialChips = useCallback((incoming: ActiveFilterChip[]) => {
+    setInitialChips(incoming)
+    onRefine([...incoming, ...appendedChips])
+  }, [appendedChips, onRefine])
 
-  const hasAny = chips.length > 0
+  const handleAppendedChips = useCallback((incoming: ActiveFilterChip[]) => {
+    setAppendedChips(incoming)
+    onRefine([...initialChips, ...incoming])
+  }, [initialChips, onRefine])
+
+  const allChips = [...initialChips, ...appendedChips]
+  const hasAny   = allChips.length > 0
 
   return (
     <aside className={styles.sidebar}
@@ -363,32 +353,90 @@ export function SidebarFilters({
           {category === 'academia' ? '🎓 Academia' : category === 'buying-selling' ? '🛒 Buy / Sell' : '🔍 General'}
         </span>
         {hasAny && (
-          <button className={styles.resetBtn} onClick={() => { setChips([]); onRefine([]) }}>Clear</button>
+          <button className={styles.resetBtn} onClick={() => { setInitialChips([]); setAppendedChips([]); onRefine([]) }}>Clear</button>
         )}
       </div>
 
-      {/* Skeleton only on the very first search — never during same-context re-searches */}
-      {isFirstSearch ? (
-        category === 'academia' ? <SkeletonAcademia /> : <SkeletonBuying />
-      ) : category === 'academia' ? (
-        <AcademiaPanel
-          topic={topic}
-          resetKey={resetKey}
-          removedChipId={removedChipId}
-          onChipsChange={handleChips}
-          onApply={onApply}
-        />
-      ) : (
-        <BuyingSellingPanel
-          topic={topic}
-          sections={sections}
-          resetKey={resetKey}
-          removedChipId={removedChipId}
-          locationRefreshKey={locationRefreshKey}
-          onChipsChange={handleChips}
-          onApply={onApply}
-        />
-      )}
+      <div className={styles.body}>
+        {isFirstSearch ? (
+          category === 'academia' ? <SkeletonAcademia /> : <SkeletonBuying />
+        ) : category === 'academia' ? (
+          <AcademiaPanel
+            topic={topic}
+            resetKey={resetKey}
+            removedChipId={removedChipId}
+            onChipsChange={handleInitialChips}
+            onApply={onApply}
+          />
+        ) : (
+          <>
+            {/* ── Block A: Initial Filters ── */}
+            {sections.length > 0 && (
+              <div>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: 'var(--text-3)',
+                  textTransform: 'uppercase', letterSpacing: '0.07em',
+                  padding: '6px 0 4px 0', marginBottom: 2,
+                  borderBottom: '1px solid var(--border)',
+                }}>
+                  Initial Filters
+                </div>
+                <BuyingSellingPanel
+                  topic={topic}
+                  sections={sections}
+                  resetKey={resetKey}
+                  removedChipId={removedChipId}
+                  locationRefreshKey={locationRefreshKey}
+                  onChipsChange={handleInitialChips}
+                  labelPrefix=""
+                />
+              </div>
+            )}
+
+            {/* ── Block B: Additional Filters (appended on YES) ── */}
+            {appendedSections.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{
+                  fontSize: 10, fontWeight: 700, color: 'var(--teal)',
+                  textTransform: 'uppercase', letterSpacing: '0.07em',
+                  padding: '6px 0 4px 0', marginBottom: 2,
+                  borderBottom: '1px solid var(--teal)',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}>
+                  <span>➕</span> Additional Filters
+                </div>
+                <BuyingSellingPanel
+                  topic={topic}
+                  sections={appendedSections}
+                  resetKey={resetKey}
+                  removedChipId={removedChipId}
+                  locationRefreshKey={locationRefreshKey}
+                  onChipsChange={handleAppendedChips}
+                  labelPrefix="appended_"
+                />
+                {/* Combined Apply button when both blocks present */}
+                <button
+                  className={styles.applyBtn}
+                  style={{ marginTop: 8 }}
+                  onClick={() => onApply(allChips)}
+                >
+                  {hasAny ? '✓ Apply all filters' : '↩ Revert to previous results'}
+                </button>
+              </div>
+            )}
+
+            {/* ── Single Apply button when only initial filters (no appended block) ── */}
+            {appendedSections.length === 0 && sections.length > 0 && (
+              <button
+                className={styles.applyBtn}
+                onClick={() => onApply(initialChips)}
+              >
+                {initialChips.length > 0 ? '✓ Apply filters' : '↩ Revert to previous results'}
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </aside>
   )
 }
