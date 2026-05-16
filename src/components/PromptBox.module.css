@@ -117,3 +117,134 @@
   opacity: 0.7;
   font-size: 11px;
 }
+
+/* ── Append to your existing PromptBox.module.css ── */
+
+/* Per-mode pill accent colours */
+.pill_web     { }   /* keeps existing default */
+.pill_llm     { }
+.pill_file    { }
+.pill_webonly.pillOn { background: #854F0B; border-color: #854F0B; color: #fff; }
+.pill_webonly:hover  { border-color: #854F0B; color: #854F0B; }
+.pill_urls.pillOn    { background: #3C3489; border-color: #3C3489; color: #fff; }
+.pill_urls:hover     { border-color: #3C3489; color: #3C3489; }
+
+/* Pill icon */
+.pillIcon { font-size: 12px; }
+
+/* ── URL Analyzer panel ── */
+.urlWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface-2);
+  border: 1px solid #3C3489;
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+}
+
+.urlHeader { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.urlTitle  { font-size: 13px; font-weight: 700; color: #3C3489; }
+.urlSub    { font-size: 11px; color: var(--text-3); }
+
+.urlTextarea {
+  width: 100%;
+  font-size: 12px;
+  font-family: 'Menlo', 'Consolas', monospace;
+  color: var(--text-1);
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  resize: vertical;
+  line-height: 1.6;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.urlTextarea:focus { outline: none; border-color: #3C3489; }
+
+.urlChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.urlChip {
+  font-size: 11px;
+  color: #3C3489;
+  background: #EEEDFE;
+  border: 1px solid #C4C1F5;
+  border-radius: 20px;
+  padding: 2px 9px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.urlError {
+  font-size: 11.5px;
+  color: #dc2626;
+  background: #fee2e2;
+  border-radius: var(--r-sm);
+  padding: 5px 9px;
+  margin: 0;
+}
+
+.urlTasks {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.urlTaskLabel {
+  font-size: 11px;
+  color: var(--text-3);
+  font-weight: 600;
+  margin-right: 2px;
+}
+.urlTaskBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-mid);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.13s;
+}
+.urlTaskBtn:hover  { border-color: #3C3489; color: #3C3489; }
+.urlTaskBtnOn      { background: #3C3489 !important; border-color: #3C3489 !important; color: #fff !important; }
+
+/* ── New button variants ── */
+.btnAmber {
+  background: #854F0B;
+  color: #fff;
+  border: none;
+}
+.btnAmber:hover { background: #6B3F09; }
+
+.btnPurple {
+  background: #3C3489;
+  color: #fff;
+  border: none;
+}
+.btnPurple:hover { background: #2E2870; }
+
+.topicHint {
+  font-size: 11px;
+  color: var(--text-3);
+  padding: 5px 10px;
+  background: var(--teal-light);
+  border-radius: var(--r-sm);
+  line-height: 1.5;
+  margin-top: -4px;
+}
+.topicHint span {
+  font-weight: 600;
+  color: var(--teal);
+  margin-right: 4px;
+}

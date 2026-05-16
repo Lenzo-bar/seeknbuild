@@ -1,7 +1,5 @@
 // api/llm.js — SeekNBuild v6
 // LLM Only mode: no Brave Search, Claude answers directly.
-// Returns: summary card + array of sub-cards (one per problem/topic).
-// Each sub-card has: title, snippet, steps[], math (KaTeX), tags[].
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -12,7 +10,6 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST')   return res.status(405).json({ error: 'Method not allowed' })
 
-  // Destructure first — everything below depends on these
   const { query, previousSummary = '', sidebarMode = false } = req.body || {}
   if (!query?.trim()) return res.status(400).json({ error: 'Missing query' })
 
@@ -24,8 +21,6 @@ export default async function handler(req, res) {
   if (USE_CLAUDE && !CLAUDE_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' })
 
   // ── Sidebar filter generation mode ───────────────────────────────────────
-  // Lightweight Claude Haiku call — generates topic-specific sidebar filters
-  // from the actual query + card samples. Non-blocking, returns quickly.
   if (sidebarMode) {
     if (!CLAUDE_KEY) return res.status(200).json({ sidebarFilters: [] })
     try {
@@ -37,7 +32,7 @@ export default async function handler(req, res) {
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'claude-haiku-4-5-20251001',   // ← FIXED model string
           max_tokens: 600,
           messages: [{ role: 'user', content: query }],
         }),
@@ -55,21 +50,33 @@ export default async function handler(req, res) {
   }
 
   // ── Normal LLM Only flow ──────────────────────────────────────────────────
-
-  // Guard: stop processing if client disconnects mid-request.
   let clientGone = false
   req.on('close', () => { clientGone = true })
 
-  const hasPrior = previousSummary.trim().length > 0
-  const summaryRule = hasPrior
-    ? '"summary": "Updated 3-5 sentence overview incorporating previous findings and new topics."'
-    : '"summary": "3-5 sentence professional overview of all topics covered in this response."'
+const hasPrior = previousSummary.trim().length > 0
 
-  const prompt = `You are an expert academic tutor and professional educator.
+const isFollowUp = hasPrior && query.includes('Follow-up:')
 
+const topicAnchor = isFollowUp
+  ? `CRITICAL TOPIC CONSTRAINT: You MUST answer ONLY within the context of this research topic:
+"${previousSummary.trim()}"
+Every card you generate must directly relate to this topic. Do NOT drift to adjacent subjects.
+Do NOT discuss AI companies, models, or unrelated subjects unless they directly relate to the topic above.
+
+`
+  : ''
+
+const summaryRule = hasPrior && !isFollowUp
+  ? '"summary": "Updated 3-5 sentence overview incorporating previous findings and new topics."'
+  : '"summary": "3-5 sentence professional overview of all topics covered in this response."'
+
+const prompt = `You are an expert academic tutor and professional educator.
+${topicAnchor}
 Query: "${query}"
-${hasPrior ? `\nPrevious summary context: "${previousSummary.trim()}"\n` : ''}
-Provide detailed, professionally formatted solutions. For math/science, include step-by-step workings with LaTeX formulas.
+${hasPrior && !isFollowUp ? `\nPrevious summary context: "${previousSummary.trim()}"\n` : ''}
+Provide detailed, professionally formatted responses tailored to the topic.
+Only include LaTeX math expressions when the topic genuinely requires mathematical notation (e.g. equations, formulas, proofs, statistics).
+For non-math topics like policy, history, environment, business, or social issues — leave the math field empty and omit the solution field entirely.
 
 Respond ONLY with this exact JSON structure (no markdown, no explanation):
 {
@@ -104,7 +111,7 @@ Respond ONLY with this exact JSON structure (no markdown, no explanation):
 summaryTable rules:
 - null if no structured comparison is useful.
 - If multiple problems share comparable properties return:
-  {"headers": ["Problem", "Formula", "Key insight"], "rows": [["Quadratic", "ax\u00b2+bx+c=0", "Discriminant determines roots"]]}
+  {"headers": ["Problem", "Formula", "Key insight"], "rows": [["Quadratic", "ax²+bx+c=0", "Discriminant determines roots"]]}
 
 sidebarFilters rules — generate these carefully:
 - Generate 3-5 filter sections that let the user refine THESE specific results.
@@ -112,15 +119,18 @@ sidebarFilters rules — generate these carefully:
 - Each filter must have a unique snake_case id, a short label (1-3 words), a type, and options.
 - Filter types: "checkboxes" (multi-select), "radio" (single choice), "select" (dropdown).
 - Each filter needs 3-6 specific options drawn from the content of your cards.
-- Example for calculus: {id:"topic", label:"Topic", type:"checkboxes", options:["Derivatives","Integrals","Limits","Series"]}
-- Example for history: {id:"period", label:"Period", type:"radio", options:["Ancient","Medieval","Modern","Contemporary"]}
+- Example for AI topics: {"id":"ai_area","label":"AI Area","type":"checkboxes","options":["Machine Learning","Neural Networks","NLP","Computer Vision","Ethics"]}
+- Example for env topics: {"id":"impact_type","label":"Impact Type","type":"checkboxes","options":["Energy","Water","Carbon","E-Waste","Land Use"]}
 - Always include a difficulty or level filter when content varies in complexity.
 - Do NOT use generic filters like "Content Type: Article/Video/Blog".
 
 Cards rules:
 - One card per distinct problem, topic, or example. Aim for 5-10 cards.
 - Each card must be self-contained and fully solved — show all working.
-- math field: use LaTeX notation. Escape backslashes (\\\\frac not \\frac).
+// REPLACE WITH:
+- math field: ONLY populate if the card genuinely contains a formula or equation. Leave as empty string "" for all non-math topics.
+- solution field: ONLY populate for math/science problems with a concrete numerical or algebraic answer. Leave as "" otherwise.
+- steps: for non-math topics, use steps to present key findings, evidence, or policy actions — not equations.
 - steps: minimum 3 steps, maximum 8. Each step is a complete sentence.
 - difficulty: assess honestly.
 - Output ONLY the JSON. No markdown fences. No preamble.`
@@ -132,7 +142,11 @@ Cards rules:
     if (USE_CLAUDE && CLAUDE_KEY) {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_KEY, 'anthropic-version': '2023-06-01' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': CLAUDE_KEY,
+          'anthropic-version': '2023-06-01',
+        },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 8000,
@@ -141,15 +155,17 @@ Cards rules:
       })
 
       if (clientGone) return
-
       if (!r.ok) return res.status(500).json({ error: `Claude ${r.status}: ${(await r.text()).slice(0, 300)}` })
-      const d  = await r.json()
-
+      const d = await r.json()
       if (clientGone) return
 
       const tb = d.content?.find(b => b.type === 'text')
       if (!tb?.text) return res.status(500).json({ error: 'No text block from Claude' })
       parsed = extractJSON(tb.text)
+
+      // If primary parse failed, try to salvage individual fields
+      if (!parsed) parsed = salvageFields(tb.text)
+
     } else {
       const r = await fetch(`${OLLAMA_URL}/api/chat`, {
         method: 'POST',
@@ -166,15 +182,13 @@ Cards rules:
       })
 
       if (clientGone) return
-
       if (!r.ok) return res.status(500).json({ error: `Ollama ${r.status}: ${(await r.text()).slice(0, 300)}` })
       const d = await r.json()
-
       if (clientGone) return
 
       const text = d.message?.content || d.response || ''
       if (!text) return res.status(500).json({ error: 'Empty Ollama response' })
-      parsed = extractJSON(text)
+      parsed = extractJSON(text) || salvageFields(text)
     }
   } catch (err) {
     if (clientGone) return
@@ -187,7 +201,6 @@ Cards rules:
   const rawCards = Array.isArray(parsed.cards) ? parsed.cards : []
   const summary  = typeof parsed.summary === 'string' ? parsed.summary : ''
 
-  // Extract sidebar filters — Claude generates these inline with the cards
   const sidebarFilters = Array.isArray(parsed.sidebarFilters)
     ? parsed.sidebarFilters
         .filter(s => s && s.id && s.label && s.type)
@@ -220,22 +233,22 @@ Cards rules:
 
   rawCards.forEach((r, i) => {
     cards.push({
-      id:         `llm-${i}`,
-      rank:       i + 1,
-      type:       'llm',
-      title:      String(r.title    ?? `Topic ${i + 1}`),
-      snippet:    String(r.snippet  ?? ''),
-      steps:      Array.isArray(r.steps) ? r.steps.map(String) : [],
-      math:       String(r.math ?? '').replace(/^`+|`+$/g, '').trim(),
-      solution:   String(r.solution ?? ''),
-      tags:       Array.isArray(r.tags) ? r.tags.map(String) : [],
-      difficulty: String(r.difficulty ?? 'intermediate'),
-      url: '',
-      zone: 'llm',
-      hasVideo: false,
-      visible: true,
+      id:          `llm-${i}`,
+      rank:        i + 1,
+      type:        'llm',
+      zone:        'llm',
+      title:       String(r.title    ?? `Topic ${i + 1}`),
+      snippet:     String(r.snippet  ?? ''),
+      steps:       Array.isArray(r.steps) ? r.steps.map(s => String(s).replace(/—/g, '-').replace(/–/g, '-')) : [],
+      math:        String(r.math ?? '').replace(/^`+|`+$/g, '').replace(/—/g, '-').replace(/–/g, '-').trim(),
+      solution:    String(r.solution ?? ''),
+      tags:        Array.isArray(r.tags) ? r.tags.map(String) : [],
+      difficulty:  String(r.difficulty ?? 'intermediate'),
+      url:         '',
+      hasVideo:    false,
+      visible:     true,
       docSelected: false,
-      source: 'Claude AI',
+      source:      'Claude AI',
     })
   })
 
@@ -250,11 +263,60 @@ Cards rules:
   })
 }
 
+// ── JSON extractors ───────────────────────────────────────────────────────────
+
+// Primary: strip markdown fences and parse the outermost {} block.
 function extractJSON(text) {
   const cleaned = text.trim()
     .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
   const s = cleaned.indexOf('{')
   const e = cleaned.lastIndexOf('}')
   if (s === -1 || e === -1) return null
-  try { return JSON.parse(cleaned.slice(s, e + 1)) } catch { return null }
+
+  // Pass 1: direct parse
+  try { return JSON.parse(cleaned.slice(s, e + 1)) } catch {}
+
+  // Pass 2: strip control characters that break JSON inside long LLM responses
+  const sanitized = cleaned.slice(s, e + 1)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+  try { return JSON.parse(sanitized) } catch {}
+
+  return null
+}
+
+// Fallback: if the full JSON can't be parsed (e.g. truncated response),
+// salvage the individual arrays field-by-field so cards still render
+// and sidebarFilters are recovered even if the outer object is malformed.
+function salvageFields(text) {
+  const result = {}
+
+  // Extract top-level string fields
+  const summaryMatch = text.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/)
+  if (summaryMatch) result.summary = summaryMatch[1]
+  const topicMatch = text.match(/"topic"\s*:\s*"([^"]*)"/)
+  if (topicMatch) result.topic = topicMatch[1]
+
+  // Extract arrays by walking brace depth
+  for (const key of ['cards', 'sidebarFilters', 'summaryTable']) {
+    const keyIdx = text.indexOf(`"${key}"`)
+    if (keyIdx === -1) continue
+    const arrStart = text.indexOf('[', keyIdx)
+    if (arrStart === -1) continue
+    const items = []
+    let depth = 0, objStart = -1
+    for (let i = arrStart; i < text.length; i++) {
+      const ch = text[i]
+      if (ch === '{') { if (depth === 0) objStart = i; depth++ }
+      else if (ch === '}') {
+        depth--
+        if (depth === 0 && objStart !== -1) {
+          try { items.push(JSON.parse(text.slice(objStart, i + 1))) } catch {}
+          objStart = -1
+        }
+      } else if (ch === ']' && depth === 0) break
+    }
+    if (items.length > 0) result[key] = items
+  }
+
+  return Object.keys(result).length > 0 ? result : null
 }

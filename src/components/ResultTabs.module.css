@@ -1,0 +1,136 @@
+/* ResultTabs.module.css */
+
+.strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  position: relative;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* Full-width bottom border that runs behind all tabs */
+.borderFill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--border);
+  z-index: 0;
+}
+
+/* ── Base tab ── */
+.tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  /* border-bottom: 2px solid transparent; */
+  background: var(--surface-2);        /* ← was: transparent */
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.14s, background 0.14s, border-color 0.14s;
+  white-space: nowrap;
+  margin-bottom: -2px;   /* overlap the border-fill */
+}
+
+.tab:hover {
+  color: var(--text-1);
+  background: var(--border-mid);        /* ← was: var(--surface-2) */
+}
+
+.tabIcon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.tabLabel {
+  line-height: 1;
+}
+
+/* ── Colour variants — active underline + hover ── */
+
+/* Blue — Web + LLM */
+.tab_blue.active {
+  color: #185FA5;
+  border-bottom-color: #185FA5;
+  background: var(--surface);
+}
+.tab_blue:not(.active):hover { color: #185FA5; }
+.badge_blue {
+  background: #E6F1FB;
+  color: #0C447C;
+}
+
+/* Teal — LLM Only */
+.tab_teal.active {
+  color: #0F6E56;
+  border-bottom-color: #0F6E56;
+  background: var(--surface);
+}
+.tab_teal:not(.active):hover { color: #0F6E56; }
+.badge_teal {
+  background: #E1F5EE;
+  color: #085041;
+}
+
+/* Amber — File Analysis */
+.tab_amber.active {
+  color: #854F0B;
+  border-bottom-color: #854F0B;
+  background: var(--surface);
+}
+.tab_amber:not(.active):hover { color: #854F0B; }
+.badge_amber {
+  background: #FAEEDA;
+  color: #633806;
+}
+
+/* Purple — All Results */
+.tab_purple.active {
+  color: #3C3489;
+  border-bottom-color: #3C3489;
+  background: var(--surface);
+}
+.tab_purple:not(.active):hover { color: #3C3489; }
+.badge_purple {
+  background: #EEEDFE;
+  color: #26215C;
+}
+
+/* ── Count badge ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Append these to ResultTabs.module.css */
+
+/* Web Only — amber/orange accent */
+.tab_amber2 { }
+.tab_amber2.active { color: #854F0B; }
+.tab_amber2.active::after { background: #854F0B; }
+.badge_amber2 { background: #FAEEDA; color: #854F0B; }
+
+/* URL Analyzer — violet accent */
+.tab_violet { }
+.tab_violet.active { color: #3C3489; }
+.tab_violet.active::after { background: #3C3489; }
+.badge_violet { background: #EEEDFE; color: #3C3489; }

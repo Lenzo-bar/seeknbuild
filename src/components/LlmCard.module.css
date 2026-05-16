@@ -1,0 +1,152 @@
+/* LlmCard.module.css — chrome identical to SearchCard */
+
+/* ── Card shell ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--r-lg);
+  display: flex;
+  flex-direction: column;
+  height: 280px;                 /* fixed height = same as SearchCard */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.09), 0 1px 2px rgba(0,0,0,0.06);
+  overflow: hidden;
+  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+.card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.13), 0 2px 6px rgba(0,0,0,0.07);
+  transform: translateY(-2px);
+  border-color: #0F6E56;
+}
+.summaryCard {
+  border-color: #0F6E56;
+  background: linear-gradient(135deg, var(--surface) 0%, #E1F5EE 100%);
+}
+.docSelected { border: 2px solid var(--gold, #D97706); background: var(--gold-light, #FEF3C7); }
+.docSelected:hover { border-color: var(--gold); }
+
+/* ── Scrollable body ── */
+.cardContent {
+  padding: 11px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+.cardContent::-webkit-scrollbar              { width: 0; }
+.cardContent::-webkit-scrollbar-track        { background: transparent; }
+.cardContent::-webkit-scrollbar-thumb        { background: transparent; border-radius: 2px; }
+.cardContent.scrollVisible::-webkit-scrollbar       { width: 3px; }
+.cardContent.scrollVisible::-webkit-scrollbar-thumb { background: var(--border-mid); }
+
+/* ── Header row ── */
+.header { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; flex-shrink: 0; }
+
+.rank {
+  font-size: 10px; font-weight: 700; color: #fff;
+  background: #0F6E56;
+  border-radius: 4px; padding: 2px 6px; line-height: 1.3; flex-shrink: 0;
+}
+.typeBadge {
+  font-size: 10px; font-weight: 600;
+  color: #085041; background: #E1F5EE;
+  border-radius: 10px; padding: 2px 8px; flex-shrink: 0;
+}
+.diffBadge     { font-size: 10px; font-weight: 600; border-radius: 10px; padding: 2px 7px; flex-shrink: 0; }
+.diffBeginner     { background: #DCFCE7; color: #166534; }
+.diffIntermediate { background: #FEF3C7; color: #92400E; }
+.diffAdvanced     { background: #FEE2E2; color: #991B1B; }
+
+/* Drag grip — far right of header, same as SearchCard */
+.grip {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  color: var(--border-mid);
+  cursor: grab;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: color 0.12s, background 0.12s;
+}
+.grip:hover      { color: var(--text-3); background: var(--surface-2); }
+.gripDragging    { cursor: grabbing; color: var(--text-2); }
+
+/* ── Content ── */
+.title   { font-size: 13px; font-weight: 600; color: var(--text-1); line-height: 1.4; flex-shrink: 0; }
+.snippet { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+
+.mathBlock {
+  background: #EEF5FB;
+  border-radius: var(--r-sm);
+  padding: 7px 10px;
+  overflow-x: auto;
+  text-align: center;
+  border-left: 3px solid #0F6E56;
+  flex-shrink: 0;
+}
+
+.steps { display: flex; flex-direction: column; gap: 5px; }
+.step  { display: flex; gap: 8px; align-items: flex-start; font-size: 11.5px; line-height: 1.55; }
+.stepNum {
+  flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
+  background: #0F6E56; color: #fff;
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; margin-top: 1px;
+}
+.stepText { color: var(--text-2); flex: 1; }
+.showMore {
+  font-size: 11px; color: #0F6E56; background: none; border: none;
+  cursor: pointer; padding: 2px 0; text-align: left; font-weight: 500;
+  transition: opacity 0.13s;
+}
+.showMore:hover { opacity: 0.75; }
+
+.solution {
+  font-size: 12px; color: var(--text-1);
+  background: #E1F5EE; border-radius: var(--r-sm);
+  padding: 6px 10px; line-height: 1.55; border-left: 3px solid #0F6E56;
+}
+.solutionLabel { font-weight: 700; color: #085041; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0; }
+.tag  { font-size: 10px; padding: 2px 7px; border-radius: 9px; background: var(--surface-2); color: var(--text-3); border: 1px solid var(--border); }
+
+/* ── Footer toolbar — identical to SearchCard ── */
+.footer {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  min-height: 34px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 0 6px;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.docGroup  { display: flex; align-items: center; gap: 4px; padding: 0 4px; }
+.docCheck  { accent-color: #0F6E56; width: 13px; height: 13px; cursor: pointer; flex-shrink: 0; }
+.docLabel  { font-size: 10px; color: var(--text-3); cursor: pointer; user-select: none; }
+
+.sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
+
+.footBtn {
+  width: 26px; height: 26px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-3);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+}
+.footBtn:hover { background: var(--border); color: var(--text-1); border-color: transparent; }
+
+.footRight { display: flex; align-items: center; gap: 1px; margin-left: auto; }
+
+.closeBtn:hover  { background: #fee2e2 !important; color: #dc2626 !important; }
+.expandBtn:hover { background: var(--teal-light) !important; color: var(--teal) !important; }

@@ -4,24 +4,52 @@ import { CSS } from '@dnd-kit/utilities'
 import type { SearchCard as CardData, CardZone } from '../types'
 import { SearchCard } from './SearchCard'
 import styles from './CardGrid.module.css'
+import { LlmCard }  from './LlmCard'
+import { FileCard } from './FileCard'
 
 function SortableCard({ card, zone, expandedId, onExpand, onDismiss, onToggleDoc }: {
-  card: CardData; zone: CardZone; expandedId: string | null
+  card: any; zone: CardZone; expandedId: string | null
   onExpand: (id: string) => void; onDismiss: (id: string) => void; onToggleDoc: (id: string) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: card.id })
 
+  const wrapperStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.55 : undefined,
+  }
+
+  // Dispatch to the correct card component by type
+  if (card.type === 'llm') {
+    return (
+      <div ref={setNodeRef} className={styles.cardWrapper} style={wrapperStyle}>
+        <LlmCard
+          card={card}
+          onExpand={() => onExpand(card.id)}
+          onDismiss={() => onDismiss(card.id)}
+          onToggleDoc={() => onToggleDoc(card.id)}
+        />
+      </div>
+    )
+  }
+
+  if (card.type === 'file') {
+    return (
+      <div ref={setNodeRef} className={styles.cardWrapper} style={wrapperStyle}>
+        <FileCard
+          card={card}
+          onExpand={() => onExpand(card.id)}
+          onDismiss={() => onDismiss(card.id)}
+          onToggleDoc={() => onToggleDoc(card.id)}
+        />
+      </div>
+    )
+  }
+
+  // Default: web card (original behaviour)
   return (
-    <div
-      ref={setNodeRef}
-      className={styles.cardWrapper}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 50 : undefined,
-        opacity: isDragging ? 0.55 : undefined,
-      }}
-    >
+    <div ref={setNodeRef} className={styles.cardWrapper} style={wrapperStyle}>
       <SearchCard
         card={card} zone={zone}
         faded={expandedId !== null && card.id !== expandedId}
@@ -35,7 +63,6 @@ function SortableCard({ card, zone, expandedId, onExpand, onDismiss, onToggleDoc
     </div>
   )
 }
-
 interface Props {
   cards: CardData[]; zone: CardZone; cols: number; expandedId: string | null
   onReorder: (zone: CardZone, oldIndex: number, newIndex: number) => void

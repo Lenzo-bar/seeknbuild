@@ -1,22 +1,165 @@
-import { useEffect, useRef } from 'react'
+// src/components/CardExpandOverlay.tsx
+// Card expand overlay with on-demand AI enrichment.
+// Enrichment fires automatically when the overlay opens.
+
+import { useEffect, useRef, useState } from 'react'
 import type { SearchCard } from '../types'
 import styles from './CardExpandOverlay.module.css'
 
-interface Props {
-  card: SearchCard
-  onClose: () => void
-  onToggleDoc: () => void
+// ── Enrichment types ──────────────────────────────────────────────────────────
+
+interface Citation { label: string; url?: string }
+
+interface ChartData { label: string; value: number }
+
+interface ChartSpec {
+  type: 'bar' | 'line' | 'pie' | 'table'
+  title: string
+  description?: string
+  data: ChartData[]
 }
 
-export function CardExpandOverlay({ card, onClose, onToggleDoc }: Props) {
-  const overlayRef = useRef<HTMLDivElement>(null)
+interface Enrichment {
+  paragraphs:           string[]
+  imageQueries:         string[]
+  chart:                ChartSpec | null
+  citations:            Citation[]
+  relevanceNote:        string
+  recommendationScore:  number | null
+  recommendationReason: string
+}
 
-  // Close on Escape
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+// ── Mini chart (no external deps) ────────────────────────────────────────────
+
+function MiniChart({ chart }: { chart: ChartSpec }) {
+  if (!chart?.data?.length) return null
+
+  if (chart.type === 'pie') {
+    const total  = chart.data.reduce((s, d) => s + (d.value || 0), 0)
+    const COLORS = ['#4f9cf9','#f9a24f','#4fd9a2','#f94f7c','#b44ff9','#f9f04f']
+    let cumAngle = -Math.PI / 2
+    const slices = chart.data.map((d, i) => {
+      const angle = (d.value / total) * 2 * Math.PI
+      const x1 = 80 + 70 * Math.cos(cumAngle)
+      const y1 = 80 + 70 * Math.sin(cumAngle)
+      cumAngle += angle
+      const x2 = 80 + 70 * Math.cos(cumAngle)
+      const y2 = 80 + 70 * Math.sin(cumAngle)
+      const large = angle > Math.PI ? 1 : 0
+      return { d:`M80,80 L${x1},${y1} A70,70 0 ${large},1 ${x2},${y2} Z`, color:COLORS[i%COLORS.length], label:d.label, pct:Math.round((d.value/total)*100) }
+    })
+    return (
+      <div className={styles.chartWrap}>
+        <p className={styles.chartTitle}>{chart.title}</p>
+        <div className={styles.pieGrid}>
+          <svg viewBox="0 0 160 160" width="140" height="140">
+            {slices.map((s,i)=><path key={i} d={s.d} fill={s.color} stroke="#fff" strokeWidth="2"/>)}
+          </svg>
+          <ul className={styles.pieLegend}>
+            {slices.map((s,i)=>(
+              <li key={i} className={styles.pieLegendItem}>
+                <span className={styles.pieDot} style={{background:s.color}}/>
+                {s.label} — {s.pct}%
+              </li>
+            ))}
+          </ul>
+        </div>
+        {chart.description&&<p className={styles.chartDesc}>{chart.description}</p>}
+      </div>
+    )
+  }
+
+  if (chart.type === 'table') {
+    return (
+      <div className={styles.chartWrap}>
+        <p className={styles.chartTitle}>{chart.title}</p>
+        <table className={styles.dataTable}>
+          <tbody>
+            {chart.data.map((row,i)=>(
+              <tr key={i}>
+                <td className={styles.tdLabel}>{row.label}</td>
+                <td className={styles.tdValue}>{row.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {chart.description&&<p className={styles.chartDesc}>{chart.description}</p>}
+      </div>
+    )
+  }
+
+  // Bar / line — horizontal bars
+  const max = Math.max(...chart.data.map(d => d.value || 0))
+  return (
+    <div className={styles.chartWrap}>
+      <p className={styles.chartTitle}>{chart.title}</p>
+      <div className={styles.barChart}>
+        {chart.data.map((d,i)=>(
+          <div key={i} className={styles.barRow}>
+            <span className={styles.barLabel}>{d.label}</span>
+            <div className={styles.barTrack}>
+              <div className={styles.barFill} style={{width:`${(d.value/max)*100}%`}}/>
+            </div>
+            <span className={styles.barVal}>{d.value}</span>
+          </div>
+        ))}
+      </div>
+      {chart.description&&<p className={styles.chartDesc}>{chart.description}</p>}
+    </div>
+  )
+}
+
+// ── Score badge ───────────────────────────────────────────────────────────────
+
+function ScoreBadge({ score, reason }: { score: number; reason?: string }) {
+  const color = score >= 8 ? '#22c55e' : score >= 5 ? '#f59e0b' : '#ef4444'
+  const label = score >= 8 ? 'Recommended' : score >= 5 ? 'Consider' : 'Low priority'
+  return (
+    <div className={styles.scoreBadge}>
+      <span className={styles.scoreNum} style={{color}}>{score}/10</span>
+      <span className={styles.scoreLabel} style={{color}}>{label}</span>
+      {reason&&<span className={styles.scoreReason}>{reason}</span>}
+    </div>
+  )
+}
+
+// ── Image strip (Unsplash free tier) ─────────────────────────────────────────
+
+function ImageStrip({ queries }: { queries: string[] }) {
+  if (!queries?.length) return null
+  return (
+    <div className={styles.imageStrip}>
+      {queries.slice(0,3).map((q,i)=>(
+        <div key={i} className={styles.imageCell}>
+          <img
+            src={`https://source.unsplash.com/featured/400x220?${encodeURIComponent(q)}&sig=${i}`}
+            alt={q}
+            className={styles.cardImage}
+            onError={e=>{(e.target as HTMLImageElement).style.display='none'}}
+          />
+          <span className={styles.imageCaption}>{q}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface Props {
+  card:         any   // SearchCard | LlmCard | FileCardData — all share the fields we need
+  query?:       string
+  onClose:      () => void
+  onToggleDoc:  () => void
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function CardExpandOverlay({ card, query = '', onClose, onToggleDoc }: Props) {
+  const backdropRef = useRef<HTMLDivElement>(null)
+  const [enrichStatus,  setEnrichStatus]  = useState<'loading'|'done'|'error'>('loading')
+  const [enrichment,    setEnrichment]    = useState<Enrichment|null>(null)
+  const [enrichError,   setEnrichError]   = useState('')
 
   // Lock body scroll
   useEffect(() => {
@@ -24,229 +167,199 @@ export function CardExpandOverlay({ card, onClose, onToggleDoc }: Props) {
     return () => { document.body.style.overflow = '' }
   }, [])
 
-  // Click outside to close
-  function handleBackdropClick(e: React.MouseEvent) {
-    if (e.target === overlayRef.current) onClose()
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  // Fire enrichment on open
+  useEffect(() => {
+    if (!card) return
+    setEnrichStatus('loading')
+    setEnrichment(null)
+    setEnrichError('')
+
+    fetch('/api/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cardTitle:   card.title,
+        cardSnippet: card.snippet,
+        cardUrl:     card.source || card.url || '',
+        cardType:    card.type,
+        query,
+      }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { setEnrichError(data.error); setEnrichStatus('error') }
+        else            { setEnrichment(data);          setEnrichStatus('done')  }
+      })
+      .catch(err => { setEnrichError(String(err)); setEnrichStatus('error') })
+  }, [card?.id])
+
+  if (!card) return null
+
+  const typeIcon: Record<string,string> = {
+    article:'📄', video:'▶', image:'🖼', file:'📁',
+    news:'📰', forum:'💬', shopping:'🛒', llm:'✦', math:'∑',
   }
 
-  const typeIcon: Record<string, string> = {
-    math: '∑', article: '📄', video: '▶', image: '🖼',
-    file: '📁', news: '📰', forum: '💬', shopping: '🛒', llm: '✦',
-  }
-
-  const typeLabel: Record<string, string> = {
-    math: 'Math', article: 'Article', video: 'Video', image: 'Image',
-    file: 'File', news: 'News', forum: 'Forum', shopping: 'Shopping', llm: 'AI Answer',
-  }
+  const isSelected = card.docSelected
 
   return (
     <div
-      ref={overlayRef}
+      ref={backdropRef}
       className={styles.backdrop}
-      onClick={handleBackdropClick}
-      role="dialog"
-      aria-modal="true"
-      aria-label={card.title}
+      onClick={e => { if (e.target === backdropRef.current) onClose() }}
+      role="dialog" aria-modal="true"
     >
       <div className={styles.panel}>
 
-        {/* ── Header bar ── */}
+        {/* ── Header ── */}
         <div className={styles.header}>
           <div className={styles.headerLeft}>
-            <span className={`${styles.typeBadge} ${styles[`type_${card.type}`]}`}>
-              <span className={styles.typeIcon}>{typeIcon[card.type] ?? '•'}</span>
-              {typeLabel[card.type] ?? card.type}
+            <span className={styles.typeBadge}>
+              {typeIcon[card.type] ?? '•'} {card.type ?? 'result'}
             </span>
-            {card.outlet && (
-              <span className={styles.outlet}>{card.outlet}</span>
-            )}
+            {(card.tags ?? []).slice(0,3).map((t:string) => (
+              <span key={t} className={styles.tag}>{t}</span>
+            ))}
           </div>
-          <div className={styles.headerRight}>
-            <button
-              className={`${styles.iconBtn} ${card.docSelected ? styles.iconBtnOn : ''}`}
-              onClick={onToggleDoc}
-              title={card.docSelected ? 'Remove from doc' : 'Add to doc'}
-            >
-              <DocIcon />
-              {card.docSelected ? 'In doc' : 'Add to doc'}
-            </button>
-            <button className={styles.closeBtn} onClick={onClose} title="Close (Esc)">
-              <CloseIcon />
-            </button>
-          </div>
+          <button className={styles.closeBtn} onClick={onClose} aria-label="Close">✕</button>
         </div>
 
         {/* ── Scrollable body ── */}
         <div className={styles.body}>
 
-          {/* Title */}
-          <h2 className={styles.title}>{card.title}</h2>
+          {/* Original card content — always at top */}
+          <div className={styles.originalSection}>
+            <h2 className={styles.cardTitle}>{card.title}</h2>
+            {(card.source || card.url) && (
+              <a
+                href={card.source || card.url}
+                target="_blank" rel="noopener noreferrer"
+                className={styles.sourceLink}
+              >
+                {card.source || card.url}
+              </a>
+            )}
+            <p className={styles.snippetText}>{card.snippet}</p>
 
-          {/* Source + date row */}
-          <div className={styles.meta}>
-            {card.source && (
-              <span className={styles.source}>
-                <GlobeIcon />
-                {card.source}
-              </span>
+            {/* Steps (LLM / File cards) */}
+            {card.steps?.length > 0 && (
+              <ol className={styles.stepList}>
+                {card.steps.map((s:string, i:number) => (
+                  <li key={i} className={styles.stepItem}>{s}</li>
+                ))}
+              </ol>
             )}
-            {card.publishedAt && (
-              <span className={styles.date}>{card.publishedAt}</span>
-            )}
-            {card.videoChannel && (
-              <span className={styles.source}>
-                <span style={{ fontSize: 11 }}>▶</span>
-                {card.videoChannel}
-              </span>
+
+            {/* Math */}
+            {card.math && (
+              <div className={styles.mathBlock}>
+                <code>{card.math}</code>
+              </div>
             )}
           </div>
 
-          {/* Video embed */}
-          {card.type === 'video' && card.videoId && (
-            <div className={styles.videoWrap}>
-              <iframe
-                src={`https://www.youtube.com/embed/${card.videoId}?autoplay=0`}
-                title={card.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className={styles.videoFrame}
-              />
+          {/* ── Enrichment zone ── */}
+          <div className={styles.enrichZone}>
+            <div className={styles.enrichDivider}>
+              <span className={styles.snbLabel}>✦ SnB Enrichment</span>
             </div>
-          )}
 
-          {/* Image */}
-          {card.imageUrl && card.type !== 'video' && (
-            <div className={styles.imageWrap}>
-              <img src={card.imageUrl} alt={card.title} className={styles.image} />
-            </div>
-          )}
-
-          {/* Snippet / full content */}
-          {card.snippet && (
-            <div className={styles.section}>
-              <div className={styles.sectionLabel}>Summary</div>
-              <p className={styles.snippet}>{card.snippet}</p>
-            </div>
-          )}
-
-          {/* Math block */}
-          {card.math && (
-            <div className={styles.section}>
-              <div className={styles.sectionLabel}>
-                <span className={styles.mathIcon}>∑</span> Mathematical expression
+            {enrichStatus === 'loading' && (
+              <div className={styles.loadingState}>
+                <div className={styles.spinner}/>
+                <div className={styles.loadingLines}>
+                  <span>Enriching content…</span>
+                  <span>Sourcing images…</span>
+                  <span>Checking for data…</span>
+                </div>
               </div>
-              <div className={styles.mathBlock}>
-                <code className={styles.math}>{card.math}</code>
+            )}
+
+            {enrichStatus === 'error' && (
+              <div className={styles.errorState}>
+                <span>⚠ Enrichment unavailable: {enrichError}</span>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Step-by-step */}
-          {card.steps && card.steps.length > 0 && (
-            <div className={styles.section}>
-              <div className={styles.sectionLabel}>Step-by-step</div>
-              <ol className={styles.steps}>
-                {card.steps.map((step, i) => (
-                  <li key={i} className={styles.step}>
-                    <span className={styles.stepNum}>{i + 1}</span>
-                    <span className={styles.stepText}>{step}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
+            {enrichStatus === 'done' && enrichment && (
+              <>
+                {/* Relevance + score row */}
+                <div className={styles.relevanceRow}>
+                  {enrichment.relevanceNote && (
+                    <p className={styles.relevanceNote}>{enrichment.relevanceNote}</p>
+                  )}
+                  {enrichment.recommendationScore != null && (
+                    <ScoreBadge
+                      score={enrichment.recommendationScore}
+                      reason={enrichment.recommendationReason}
+                    />
+                  )}
+                </div>
 
-          {/* Price / rating (shopping) */}
-          {(card.price || card.rating) && (
-            <div className={styles.shoppingRow}>
-              {card.price && (
-                <span className={styles.price}>{card.price}</span>
-              )}
-              {card.rating && (
-                <span className={styles.rating}>
-                  {'★'.repeat(Math.round(card.rating))}{'☆'.repeat(5 - Math.round(card.rating))}
-                  <span className={styles.ratingNum}> {card.rating.toFixed(1)}</span>
-                </span>
-              )}
-            </div>
-          )}
+                {/* Images */}
+                <ImageStrip queries={enrichment.imageQueries}/>
 
-          {/* Forum stats */}
-          {card.type === 'forum' && (card.upvotes !== undefined || card.replies !== undefined) && (
-            <div className={styles.forumRow}>
-              {card.upvotes !== undefined && (
-                <span className={styles.forumStat}>▲ {card.upvotes} upvotes</span>
-              )}
-              {card.replies !== undefined && (
-                <span className={styles.forumStat}>💬 {card.replies} replies</span>
-              )}
-              {card.forum && (
-                <span className={styles.forumStat}>📌 {card.forum}</span>
-              )}
-            </div>
-          )}
+                {/* Paragraphs */}
+                <div className={styles.paragraphs}>
+                  {enrichment.paragraphs.map((p,i) => (
+                    <p key={i} className={styles.para}>{p}</p>
+                  ))}
+                </div>
 
-          {/* Tags */}
-          {card.tags && card.tags.length > 0 && (
-            <div className={styles.tagsRow}>
-              {card.tags.map(tag => (
-                <span key={tag} className={styles.tag}>{tag}</span>
-              ))}
-            </div>
-          )}
+                {/* Chart */}
+                {enrichment.chart && <MiniChart chart={enrichment.chart}/>}
 
-          {/* Visit source */}
-          {card.source && (
-            <div className={styles.visitRow}>
-              <a
-                href={card.source.startsWith('http') ? card.source : `https://${card.source}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.visitLink}
-              >
-                Visit source <ExternalIcon />
-              </a>
-            </div>
+                {/* Citations */}
+                {enrichment.citations?.length > 0 && (
+                  <div className={styles.citations}>
+                    <p className={styles.citationsLabel}>Sources</p>
+                    <ul className={styles.citationList}>
+                      {enrichment.citations.map((c,i) => (
+                        <li key={i}>
+                          {c.url
+                            ? <a href={c.url} target="_blank" rel="noopener noreferrer" className={styles.citationLink}>{c.label||c.url}</a>
+                            : <span className={styles.citationText}>{c.label}</span>
+                          }
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── Footer ── */}
+        <div className={styles.footer}>
+          <button
+            className={`${styles.docBtn} ${isSelected ? styles.docBtnSelected : ''}`}
+            onClick={onToggleDoc}
+          >
+            {isSelected ? '✓ Selected for Publishing' : '+ Add to Document'}
+          </button>
+          {enrichStatus === 'done' && (
+            <span className={styles.enrichedBadge}>✦ AI Enriched</span>
+          )}
+          {(card.source || card.url) && (
+            <a
+              href={card.source || card.url}
+              target="_blank" rel="noopener noreferrer"
+              className={styles.visitBtn}
+            >
+              Visit source ↗
+            </a>
           )}
         </div>
+
       </div>
     </div>
-  )
-}
-
-/* ── Icons ── */
-function CloseIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-    </svg>
-  )
-}
-function DocIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-      <polyline points="14 2 14 8 20 8"/>
-      <line x1="16" y1="13" x2="8" y2="13"/>
-      <line x1="16" y1="17" x2="8" y2="17"/>
-    </svg>
-  )
-}
-function GlobeIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <circle cx="12" cy="12" r="10"/>
-      <line x1="2" y1="12" x2="22" y2="12"/>
-      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-    </svg>
-  )
-}
-function ExternalIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-      <polyline points="15 3 21 3 21 9"/>
-      <line x1="10" y1="14" x2="21" y2="3"/>
-    </svg>
   )
 }

@@ -1,0 +1,13 @@
+/* Append these to ResultTabs.module.css */
+
+/* Web Only — amber/orange accent */
+.tab_amber2 { }
+.tab_amber2.active { color: #854F0B; }
+.tab_amber2.active::after { background: #854F0B; }
+.badge_amber2 { background: #FAEEDA; color: #854F0B; }
+
+/* URL Analyzer — violet accent */
+.tab_violet { }
+.tab_violet.active { color: #3C3489; }
+.tab_violet.active::after { background: #3C3489; }
+.badge_violet { background: #EEEDFE; color: #3C3489; }

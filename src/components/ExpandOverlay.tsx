@@ -2,10 +2,15 @@ import { useRef, useEffect } from 'react'
 import type { SearchCard } from '../types'
 import styles from './ExpandOverlay.module.css'
 
+// ── KaTeX fix: unescape double-backslashes from API (\\frac → \frac) ─────────
+function fixLatex(raw: string): string {
+  return raw.replace(/\\\\/g, '\\')
+}
+
 async function renderMath(el: HTMLElement, latex: string, display = false) {
   try {
     const katex = await import('katex')
-    katex.default.render(latex, el, { throwOnError: false, displayMode: display, output: 'html' })
+    katex.default.render(fixLatex(latex), el, { throwOnError: false, displayMode: display, output: 'html' })
   } catch {
     el.textContent = latex
   }
@@ -17,25 +22,31 @@ function MathBlock({ latex, display = false }: { latex: string; display?: boolea
   return <span ref={ref} />
 }
 
+// ── Step: splits on $...$ and \(...\) and renders each part via KaTeX ────────
 function Step({ text }: { text: string }) {
   const ref = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
     if (!ref.current) return
-    // Render any inline \(...\) math in step text
-    const html = text.replace(/\\\((.+?)\\\)/g, (_, latex) => {
-      try {
-        const div = document.createElement('span')
-        import('katex').then(({ default: katex }) => {
-          katex.render(latex, div, { throwOnError: false, displayMode: false, output: 'html' })
-        })
-        return div.outerHTML
-      } catch { return latex }
+    const el = ref.current
+    const parts = text.split(/(\\\(.*?\\\)|\$[^$]+\$)/g)
+    el.innerHTML = ''
+    parts.forEach(part => {
+      if (part.startsWith('\\(') && part.endsWith('\\)')) {
+        const span = document.createElement('span')
+        renderMath(span, part.slice(2, -2), false)
+        el.appendChild(span)
+      } else if (part.startsWith('$') && part.endsWith('$')) {
+        const span = document.createElement('span')
+        renderMath(span, part.slice(1, -1), false)
+        el.appendChild(span)
+      } else {
+        el.appendChild(document.createTextNode(part))
+      }
     })
-    ref.current.innerHTML = html
   }, [text])
 
-  return <span ref={ref}>{text}</span>
+  return <span ref={ref} />
 }
 
 interface Props {
@@ -45,7 +56,6 @@ interface Props {
 }
 
 export function ExpandOverlay({ card, onClose, onToggleDoc }: Props) {
-  // Close on Escape key
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)

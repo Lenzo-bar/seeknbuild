@@ -1,0 +1,161 @@
+// ═══════════════════════════════════════════════════════════════════
+// App.tsx — 5 SURGICAL EDITS
+// Apply each FIND → REPLACE in order. Everything else stays the same.
+// ═══════════════════════════════════════════════════════════════════
+
+// ───────────────────────────────────────────────────────────────────
+// EDIT 1 of 5 — Destructure new values from useCards
+// Location: top of App(), in the useCards() destructure block
+// ───────────────────────────────────────────────────────────────────
+// FIND:
+    isMoreLoading,
+    clearWeb, clearLlm, clearFile, clearWebOnly, clearUrls, reset,
+
+// REPLACE WITH:
+    isMoreLoading,
+    appendedFilters, appendSidebarFilters, clearAppendedFilters,
+    clearWeb, clearLlm, clearFile, clearWebOnly, clearUrls, reset,
+
+
+// ───────────────────────────────────────────────────────────────────
+// EDIT 2 of 5 — Add pendingAppendQuery state (new state variable)
+// Location: in the "UI state" block, after const [currentAppMode...
+// ───────────────────────────────────────────────────────────────────
+// FIND:
+  const [currentAppMode, setCurrentAppMode] = useState<AppMode>('web')
+
+// REPLACE WITH:
+  const [currentAppMode, setCurrentAppMode] = useState<AppMode>('web')
+  // After YES dialog: query that triggered it — used to generate+append new filters
+  const [pendingAppendQuery, setPendingAppendQuery] = useState<string | null>(null)
+
+
+// ───────────────────────────────────────────────────────────────────
+// EDIT 3 of 5 — handleReset: clear appended filters
+// Location: inside handleReset()
+// ───────────────────────────────────────────────────────────────────
+// FIND (first two lines of handleReset):
+  function handleReset(){
+    reset(); llmMulti.clearAll()
+    setSessionHasSearched(false)
+
+// REPLACE WITH:
+  function handleReset(){
+    reset(); llmMulti.clearAll()
+    setSessionHasSearched(false)
+    clearAppendedFilters()
+    setPendingAppendQuery(null)
+
+
+// ───────────────────────────────────────────────────────────────────
+// EDIT 4 of 5 — dlgYes: set pendingAppendQuery so filters get appended after search
+// Location: inside dlgYes()
+// ───────────────────────────────────────────────────────────────────
+// FIND:
+  function dlgYes() {
+    setShowTopicDlg(false); setSameCtxOk(true)
+    if (pendingSearchAfterTopic) {
+      const { q, m, s } = pendingSearchAfterTopic
+      setPendingSearchAfterTopic(null)
+      if (pendingAppMode === 'llm')         fireLlm(enrichQuery(q))
+      else if (pendingAppMode === 'webonly') fireWebOnly(enrichQuery(q))
+      else sameSearch(q, m, s, false)
+    }
+  }
+
+// REPLACE WITH:
+  function dlgYes() {
+    setShowTopicDlg(false); setSameCtxOk(true)
+    if (pendingSearchAfterTopic) {
+      const { q, m, s } = pendingSearchAfterTopic
+      setPendingSearchAfterTopic(null)
+      // Mark this query so the completion useEffect appends new filters below existing ones
+      setPendingAppendQuery(q)
+      if (pendingAppMode === 'llm')         fireLlm(enrichQuery(q))
+      else if (pendingAppMode === 'webonly') fireWebOnly(enrichQuery(q))
+      else sameSearch(q, m, s, false)
+    }
+  }
+
+
+// ───────────────────────────────────────────────────────────────────
+// EDIT 5 of 5 — Add useEffect to generate+append filters after YES search completes
+//               AND pass appendedSections to SidebarFilters
+// ───────────────────────────────────────────────────────────────────
+
+// PART A — Add this useEffect AFTER the existing useEffects block
+// (best placed after: useEffect(()=>{ if(!isUrlAnalyzing&&...) },[...]))
+// ───────────────────────────────────────────────────────────────────
+// ADD (new useEffect, not a replacement):
+
+  // After YES dialog: when the follow-up search finishes, generate new topic-specific
+  // filters from the new results and APPEND them below the existing sidebar filters.
+  // This implements the "Initial Filters + Additional Filters" two-block design.
+  useEffect(() => {
+    if (!pendingAppendQuery) return
+    // Wait for all active searches to finish
+    if (isSearching || isLlmSearching || isWebOnlySearching || isUrlAnalyzing || isAnalyzing) return
+
+    const q = pendingAppendQuery
+    setPendingAppendQuery(null)
+
+    // Gather card samples from whichever tab was just searched
+    const samples: {title:string; tags:string[]; source?:string}[] = [
+      ...webCards.filter(c => (c as any).rank !== 0).slice(0, 8).map(c => ({ title: c.title, tags: (c as any).tags ?? [], source: c.source })),
+      ...webOnlyCards.filter(c => (c as any).rank !== 0).slice(0, 8).map(c => ({ title: c.title, tags: (c as any).tags ?? [], source: c.source })),
+      ...urlCards.filter(c => (c as any).rank !== 0).slice(0, 6).map(c => ({ title: c.title, tags: (c as any).tags ?? [] })),
+    ].slice(0, 12)
+
+    if (samples.length === 0) return
+
+    // Call the API to generate new filters for the extended/new prompt
+    fetch('/api/llm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `You are generating sidebar filter controls for a research app called SeekNBuild.
+
+The user extended their search with: "${q}"
+
+The new result cards returned were:
+${samples.map((c,i) => `${i+1}. "${c.title}"${c.tags?.length ? ' [' + c.tags.slice(0,3).join(', ') + ']' : ''}`).join('\n')}
+
+Generate 2-4 NEW sidebar filter sections for these additional results.
+IMPORTANT: These filters will be shown in a separate "Additional Filters" block
+BELOW the existing initial filters — so do NOT duplicate filter types already
+common to the initial search (like Date, Difficulty). Focus on what's NEW or
+DIFFERENT about this extended query compared to the original.
+
+Option values MUST be words/phrases that appear in the card titles, snippets, or tags above.
+
+Respond with ONLY a JSON array:
+[{"id":"snake_id","label":"Short Label","type":"checkboxes","options":["A","B","C"]}]`,
+        sidebarMode: true,
+      }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      const filters = Array.isArray(data.sidebarFilters) ? data.sidebarFilters : []
+      if (filters.length > 0) appendSidebarFilters(filters)
+    })
+    .catch(() => {/* fail silently */})
+  }, [pendingAppendQuery, isSearching, isLlmSearching, isWebOnlySearching, isUrlAnalyzing, isAnalyzing])
+
+
+// PART B — Pass appendedSections to SidebarFilters in JSX
+// FIND (in the JSX layout section):
+          <SidebarFilters
+            category={filterCat} topic={currentTopic||''} sections={sidebarFilters}
+            isFirstSearch={isFirstSearch} resetKey={filterResetKey}
+            locationRefreshKey={locationRefreshKey} removedChipId={removedChipId}
+            onRefine={handleRefine} onApply={handleApply}
+          />
+
+// REPLACE WITH:
+          <SidebarFilters
+            category={filterCat} topic={currentTopic||''} sections={sidebarFilters}
+            appendedSections={appendedFilters}
+            isFirstSearch={isFirstSearch} resetKey={filterResetKey}
+            locationRefreshKey={locationRefreshKey} removedChipId={removedChipId}
+            onRefine={handleRefine} onApply={handleApply}
+          />

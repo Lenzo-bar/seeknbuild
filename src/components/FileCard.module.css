@@ -1,0 +1,169 @@
+/* FileCard.module.css — chrome identical to SearchCard */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-top: 3px solid var(--navy);   /* overridden inline per cardKind */
+  border-radius: var(--r-lg);
+  display: flex;
+  flex-direction: column;
+  height: 280px;                       /* fixed height = same as SearchCard */
+  box-shadow: 0 2px 6px rgba(0,0,0,0.09), 0 1px 2px rgba(0,0,0,0.06);
+  overflow: hidden;
+  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+.card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.13), 0 2px 6px rgba(0,0,0,0.07);
+  transform: translateY(-2px);
+}
+.docSelected { border: 2px solid var(--gold, #D97706); background: var(--gold-light, #FEF3C7); }
+.docSelected:hover { border-color: var(--gold); }
+
+/* ── Scrollable body ── */
+.cardContent {
+  padding: 11px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+.cardContent::-webkit-scrollbar              { width: 0; }
+.cardContent::-webkit-scrollbar-track        { background: transparent; }
+.cardContent::-webkit-scrollbar-thumb        { background: transparent; border-radius: 2px; }
+.cardContent.scrollVisible::-webkit-scrollbar       { width: 3px; }
+.cardContent.scrollVisible::-webkit-scrollbar-thumb { background: var(--border-mid); }
+
+/* ── Header row ── */
+.header { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; flex-shrink: 0; }
+
+.kindBadge {
+  font-size: 10px; font-weight: 700;
+  border-radius: 10px; padding: 3px 9px; flex-shrink: 0;
+}
+.pairBadge {
+  font-size: 10px; font-weight: 600;
+  color: var(--text-3); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 2px 7px; flex-shrink: 0;
+}
+.diffBadge { font-size: 10px; font-weight: 600; border-radius: 10px; padding: 2px 7px; flex-shrink: 0; }
+.diffBeg   { background: #DCFCE7; color: #166534; }
+.diffMid   { background: #FEF3C7; color: #92400E; }
+.diffAdv   { background: #FEE2E2; color: #991B1B; }
+
+/* Drag grip — far right of header */
+.grip {
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px;
+  border-radius: 4px;
+  color: var(--border-mid);
+  cursor: grab;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: color 0.12s, background 0.12s;
+}
+.grip:hover   { color: var(--text-3); background: var(--surface-2); }
+.gripDragging { cursor: grabbing; color: var(--text-2); }
+
+/* ── Content ── */
+.title   { font-size: 13px; font-weight: 600; color: var(--text-1); line-height: 1.4; flex-shrink: 0; }
+.snippet { font-size: 12px; color: var(--text-2); line-height: 1.65; }
+
+.mathBlock {
+  background: #EEF5FB;
+  border-radius: var(--r-sm);
+  padding: 7px 10px;
+  overflow-x: auto;
+  text-align: center;
+  border-left: 3px solid currentColor;
+  flex-shrink: 0;
+}
+
+.steps { display: flex; flex-direction: column; gap: 5px; }
+.step  { display: flex; gap: 8px; align-items: flex-start; font-size: 11.5px; line-height: 1.55; }
+.stepNum {
+  flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%;
+  color: #fff; font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; margin-top: 1px;
+}
+.stepText { color: var(--text-2); flex: 1; }
+.showMore {
+  font-size: 11px; background: none; border: none;
+  cursor: pointer; padding: 2px 0; text-align: left; font-weight: 500;
+  transition: opacity 0.13s;
+}
+.showMore:hover { opacity: 0.75; }
+
+.solution {
+  font-size: 12px; color: var(--text-1);
+  border-radius: var(--r-sm); padding: 6px 10px;
+  line-height: 1.55; border-left: 3px solid;
+}
+.solutionLabel { font-weight: 700; }
+
+.chartWrap { display: flex; flex-direction: column; gap: 4px; }
+.chart     { width: 100%; height: 120px; border-radius: var(--r-sm); }
+.chartDesc { font-size: 10.5px; color: var(--text-3); line-height: 1.5; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0; }
+.tag  { font-size: 10px; padding: 2px 7px; border-radius: 9px; background: var(--surface-2); color: var(--text-3); border: 1px solid var(--border); }
+
+/* ── Footer toolbar — identical to SearchCard ── */
+.footer {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  min-height: 34px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 0 6px;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.docGroup { display: flex; align-items: center; gap: 4px; padding: 0 4px; }
+.docCheck { accent-color: var(--navy); width: 13px; height: 13px; cursor: pointer; flex-shrink: 0; }
+.docLabel { font-size: 10px; color: var(--text-3); cursor: pointer; user-select: none; }
+
+.sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
+
+.footBtn {
+  width: 26px; height: 26px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-3);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+}
+.footBtn:hover { background: var(--border); color: var(--text-1); border-color: transparent; }
+
+.footRight { display: flex; align-items: center; gap: 1px; margin-left: auto; }
+
+.closeBtn:hover  { background: #fee2e2 !important; color: #dc2626 !important; }
+.expandBtn:hover { background: var(--teal-light) !important; color: var(--teal) !important; }
+
+/* ── Summary banner variant (rank===0, cardKind==='summary') ── */
+.summaryBanner {
+  background: linear-gradient(135deg, var(--surface) 0%, #E6F1FB 100%);
+  border: 1px solid #185FA5;
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.summaryHeader { display: flex; align-items: center; gap: 8px; }
+.summaryIcon   { font-size: 16px; }
+.summaryLabel  { font-size: 11px; font-weight: 700; color: #185FA5; text-transform: uppercase; letter-spacing: 0.05em; }
+.summarySource { font-size: 10px; color: var(--text-3); margin-left: auto; font-style: italic; }
+.summaryTitle  { font-size: 14px; font-weight: 600; color: var(--text-1); line-height: 1.4; }
+.summaryText   { font-size: 12px; color: var(--text-2); line-height: 1.65; }
+.summaryTags   { display: flex; flex-wrap: wrap; gap: 4px; }

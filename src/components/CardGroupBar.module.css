@@ -1,0 +1,146 @@
+/* CardGroupBar.module.css */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--r-md);
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.select {
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-1);
+  background: var(--surface-2);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--r-sm);
+  padding: 5px 10px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.13s;
+  max-width: 240px;
+}
+.select:hover, .select:focus {
+  border-color: var(--teal);
+}
+
+.subItems {
+  font-size: 11px;
+  color: var(--teal);
+  background: var(--teal-light);
+  border-radius: 10px;
+  padding: 3px 9px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+/* Custom input row */
+.customRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.customInput {
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text-1);
+  background: var(--surface-2);
+  border: 1px solid var(--teal);
+  border-radius: var(--r-sm);
+  padding: 5px 10px;
+  outline: none;
+  width: 220px;
+}
+.customOk {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  border: none;
+  background: var(--teal);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.13s;
+}
+.customOk:hover { opacity: 0.85; }
+.customCancel {
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-mid);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 0.13s;
+}
+.customCancel:hover { color: var(--red, #dc2626); }
+
+/* Toggle switch */
+.toggleLabel {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+.toggle {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--border-mid);
+  position: relative;
+  transition: background 0.18s;
+  cursor: pointer;
+  outline: none;
+  flex-shrink: 0;
+}
+.toggle:focus-visible {
+  box-shadow: 0 0 0 2px var(--teal);
+}
+.toggleOn {
+  background: var(--teal);
+}
+.toggleKnob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.18s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggleOn .toggleKnob {
+  transform: translateX(16px);
+}
+.toggleText {
+  font-size: 11px;
+  color: var(--text-2);
+  font-weight: 500;
+}

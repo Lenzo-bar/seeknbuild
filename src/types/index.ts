@@ -1,7 +1,7 @@
-export type CardType  = 'math'|'article'|'video'|'image'|'file'|'news'|'forum'|'shopping'|'llm'
-export type CardZone  = 'web'|'file'|'more'
-export type AppMode   = 'web'|'llm'|'file'
-export type ThemeName = 'light'|'warm'|'dark'|'blue'
+export type CardType       = 'math'|'article'|'video'|'image'|'file'|'news'|'forum'|'shopping'|'llm'
+export type CardZone       = 'web'|'file'|'more'|'webonly'|'urls'
+export type AppMode        = 'web'|'llm'|'file'|'webonly'|'urls'
+export type ThemeName      = 'light'|'warm'|'dark'|'blue'
 export type FilterCategory = 'buying-selling'|'academia'|'general'
 
 export type SearchMode =
@@ -36,7 +36,6 @@ export interface FilterState {
   extraFilter: string
 }
 
-// Sidebar filter section — shared by both categories
 export interface SidebarFilterSection {
   id: string
   label: string
@@ -45,18 +44,17 @@ export interface SidebarFilterSection {
   min?: number; max?: number; unit?: string
 }
 
-// Academia-specific sidebar shape
 export interface AcademiaFilterState {
-  primaryChecks: Record<string, boolean>   // up to 10 checkboxes
-  level: string                            // learner level dropdown
-  secondaryA: string                       // sub-topic dropdown
-  secondaryB: string                       // format/type dropdown
+  primaryChecks: Record<string, boolean>
+  level: string
+  secondaryA: string
+  secondaryB: string
 }
 
-// Active filter chip shown below prompt
 export interface ActiveFilterChip {
-  id: string
-  label: string
-  value: string
-  category: FilterCategory
+  id:         string
+  sectionId?: string          // which sidebar section this came from
+  label:      string
+  value:      string
+  category?:  FilterCategory  // optional — not all chips have a category
 }

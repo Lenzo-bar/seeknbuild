@@ -1,0 +1,162 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   LlmCard.module.css  —  add these blocks to your existing file
+   (or merge into it; existing rules that aren't listed here stay unchanged)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Card base: grab cursor + stacked ghost effect ────────────────────────── */
+.card {
+  position:  relative;       /* anchor for ::before / ::after ghost layers    */
+  cursor:    grab;
+}
+.card:active {
+  cursor:    grabbing;
+}
+
+/* Ghost card layer 1 (bottom-most) */
+.card[data-stacked="true"]::before {
+  content:       '';
+  position:      absolute;
+  inset:         0;
+  border-radius: inherit;
+  background:    var(--card-bg, #f8f9fb);
+  border:        1px solid rgba(0,0,0,.08);
+  transform:     translate(6px, 6px) rotate(1.5deg);
+  z-index:       -2;
+  box-shadow:    0 1px 4px rgba(0,0,0,.06);
+}
+
+/* Ghost card layer 2 (middle) */
+.card[data-stacked="true"]::after {
+  content:       '';
+  position:      absolute;
+  inset:         0;
+  border-radius: inherit;
+  background:    var(--card-bg, #f8f9fb);
+  border:        1px solid rgba(0,0,0,.07);
+  transform:     translate(3px, 3px) rotate(0.7deg);
+  z-index:       -1;
+  box-shadow:    0 1px 3px rgba(0,0,0,.05);
+}
+
+/* ── Footer with bottom icons ─────────────────────────────────────────────── */
+.footer {
+  display:         flex;
+  align-items:     center;
+  gap:             8px;
+  padding:         6px 12px 8px;
+  border-top:      1px solid rgba(0,0,0,.07);
+  flex-wrap:       wrap;
+}
+
+.footerIcons {
+  display:     flex;
+  align-items: center;
+  gap:         4px;
+  margin-right: 4px;
+}
+
+.iconBtn {
+  background:    none;
+  border:        none;
+  cursor:        pointer;
+  font-size:     13px;
+  padding:       2px 4px;
+  border-radius: 4px;
+  color:         #64748b;
+  line-height:   1;
+  transition:    background 0.15s, color 0.15s;
+}
+.iconBtn:hover {
+  background: rgba(0,0,0,.07);
+  color:      #1a1a2e;
+}
+
+.dragHandle {
+  cursor:      grab;
+  font-size:   14px;
+  color:       #94a3b8;
+  padding:     2px 4px;
+  user-select: none;
+  line-height: 1;
+}
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.footerDoc {
+  display:     flex;
+  align-items: center;
+  gap:         4px;
+  flex:        1;
+}
+
+/* ── Summary Banner (rank === 0) ─────────────────────────────────────────────
+   Renders as a flat, full-width banner — NOT a stacked card
+   ─────────────────────────────────────────────────────────────────────────── */
+.summaryBanner {
+  width:         100%;
+  background:    linear-gradient(135deg, #e8f4fd 0%, #f0f9f6 100%);
+  border:        1px solid #b3d9f0;
+  border-left:   4px solid #0e7490;
+  border-radius: 8px;
+  padding:       14px 18px;
+  margin-bottom: 16px;
+  box-shadow:    0 1px 6px rgba(14,116,144,.08);
+}
+
+.summaryHeader {
+  display:     flex;
+  align-items: center;
+  gap:         8px;
+  margin-bottom: 8px;
+}
+
+.summaryIcon {
+  font-size:  16px;
+  color:      #0e7490;
+}
+
+.summaryLabel {
+  font-size:   12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color:       #0e7490;
+}
+
+.summaryText {
+  font-size:   14px;
+  line-height: 1.6;
+  color:       #1e293b;
+  margin:      0 0 8px;
+}
+
+.summarySteps {
+  display:        flex;
+  flex-direction: column;
+  gap:            6px;
+  margin-top:     8px;
+}
+
+.summaryStep {
+  display:     flex;
+  align-items: flex-start;
+  gap:         8px;
+  font-size:   13px;
+  color:       #334155;
+}
+
+.summaryStepNum {
+  min-width:     20px;
+  height:        20px;
+  border-radius: 50%;
+  background:    #0e7490;
+  color:         #fff;
+  font-size:     11px;
+  font-weight:   700;
+  display:       flex;
+  align-items:   center;
+  justify-content: center;
+  flex-shrink:   0;
+  margin-top:    1px;
+}

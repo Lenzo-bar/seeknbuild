@@ -18,4 +18,6 @@ export const SEARCH_MODES: SearchModeConfig[] = [
       { id: 'fishing',    label: 'Fishing' },
     ],
   },
+  //{ id: 'webonly', label: '🌐 Web Only' },   // ← ADD
+  //{ id: 'urls',    label: '🔗 URL Analyze' }, // ← ADD
 ]

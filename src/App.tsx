@@ -91,11 +91,11 @@ export default function App() {
     isFiltering, searchTime, filterTime, totalCards,
     summaryTable, cardGroups,
     search, llmSearch, analyzeFile, webonlySearch, analyzeUrls, addMoreQuestion, clientRefine,
-    isMoreLoading,
+    isMoreLoading,moreHistory, clearMoreHistory,
     clearWeb, clearLlm, clearFile, clearWebOnly, clearUrls, reset,
     dismissCard, toggleDocSelect, clearDocSelections, reorderCards,
     convertLinksToCards, convertWebOnlyLinksToCards, webOnlyTyped,
-    modeFilter, setModeFilter, filteredTyped,
+    modeFilter, setModeFilter, filteredTyped, 
   } = useCards()
 
   // ── Feature ①: Prompt history ─────────────────────────────────────────────
@@ -165,6 +165,7 @@ export default function App() {
   const [removedChipId,      setRemovedChipId]      = useState<string|null>(null)
   const [lastWebQuery,       setLastWebQuery]        = useState('')
   const [lastAnalyzedUrls,   setLastAnalyzedUrls]   = useState<string[]>([])
+  const forceResetSidebarRef = useRef(false)   // ← ADD HERE
   const [allFilterScope, setAllFilterScope] = useState<'all'|'web'|'llm'|'file'|'webonly'|'urls'>('all')
   const [currentAppMode, setCurrentAppMode] = useState<AppMode>('web')
 
@@ -214,11 +215,15 @@ export default function App() {
       
   useEffect(()=>{ if(!hasWeb){setWebGrpId(null);setWebGrpOn(false)} },[hasWeb])
   // Apply sidebar filters from multi-LLM slot when search completes
+  // REPLACE with this:
+  const prevSidebarLoadingRef = useRef(false)
   useEffect(() => {
-    if (!llmMulti.isAnyLoading && llmMulti.latestSidebarFilters.length > 0) {
+    const nowLoading = llmMulti.isAnyLoading
+    if (prevSidebarLoadingRef.current && !nowLoading && llmMulti.latestSidebarFilters.length > 0) {
       setSidebarFilters(llmMulti.latestSidebarFilters)
     }
-  }, [llmMulti.isAnyLoading, llmMulti.latestSidebarFilters])
+    prevSidebarLoadingRef.current = nowLoading
+  }, [llmMulti.isAnyLoading])
 
   // LLM multi: switch to llm tab only when loading transitions from true→false (search just completed)
   // Do NOT watch activeSlots array directly — it's a new reference every render and causes infinite loops
@@ -255,6 +260,21 @@ export default function App() {
     search(query,mode,sub,!isVeryFirst,append,append?getSummaryText():'')
     setActiveTab('web');setExpandedId(null);setShowDoc(false);setShowMoreQ(false)
   }
+
+  // ── freshSearchForced: like freshSearch but always passes keepFilters=false ──
+  // Add this alongside freshSearch():
+  function freshSearchForced(query: string, mode: SearchMode, sub: string) {
+    promptHistory.addEntry(query, currentAppMode)
+    if (!sessionTopic) setSessionTopic(query)
+    setActiveChips([]); setFilterResetKey(k=>k+1)
+    setSessionHasSearched(true)
+    setLockedTopic(query); setSameCtxOk(false); setDlgShownThisEdit(false); setIsFirstSearch(true)
+    setLastWebQuery(query)
+    // Force keepFilters=false regardless of isVeryFirst — this is a "No, reset" action
+    search(query, mode, sub, false, false, '')
+    setActiveTab('web'); setExpandedId(null); setShowDoc(false); setShowMoreQ(false)
+  }
+
   function sameSearch(query:string,mode:SearchMode,sub:string,append=false){
     promptHistory.addEntry(query, currentAppMode)   // ← ① save to history
     setLockedTopic(query);setDlgShownThisEdit(false);setIsFirstSearch(false)
@@ -265,29 +285,18 @@ export default function App() {
   function handleAppendYes(){ setShowAppendDlg(false); sameCtxOk?sameSearch(pendingQ,pendingM,pendingS,true):freshSearch(pendingQ,pendingM,pendingS,true) }
   function handleAppendNo(){  setShowAppendDlg(false); sameCtxOk?sameSearch(pendingQ,pendingM,pendingS,false):freshSearch(pendingQ,pendingM,pendingS,false) }
 
-  /*
+  // REPLACE WITH:
+// ─────────────────────────────────────────────────────────────────────────────
 
   function fireLlm(query: string) {
     promptHistory.addEntry(query, 'llm')
     if (!sessionTopic) setSessionTopic(query)
     setSessionHasSearched(true)
-    // keepFilters=false on first LLM search so sidebar gets populated from API response.
-    // keepFilters=true on subsequent same-topic searches so user's filters persist.
-    const keepFilters = hasLlmSearched && sessionHasSearched
-    setActiveTab('llm')
-    llmSearch(query, hasLlmSearched ? (llmCards.find(c=>c.rank===0)?.snippet??'') : '', keepFilters)
-    setExpandedId(null)
-  }
-
-  */
-
-  function fireLlm(query: string) {
-    console.log('🔥 fireLlm called, query:', query)   // ← ADD THIS
-    promptHistory.addEntry(query, 'llm')
-    if (!sessionTopic) setSessionTopic(query)
-    setSessionHasSearched(true)
-    const keepFilters = hasLlmSearched && sessionHasSearched
-    console.log('🔥 keepFilters:', keepFilters)        // ← ADD THIS
+    // Respect a force-reset from dlgNo (user said "No, new topic")
+    const keepFilters = forceResetSidebarRef.current
+      ? false
+      : hasLlmSearched && sessionHasSearched
+    forceResetSidebarRef.current = false  // consume the flag
     setActiveTab('llm')
     llmSearch(query, hasLlmSearched ? (llmCards.find(c=>c.rank===0)?.snippet??'') : '', keepFilters)
     setExpandedId(null)
@@ -297,12 +306,15 @@ export default function App() {
     promptHistory.addEntry(query, 'webonly')
     if (!sessionTopic) setSessionTopic(query)
     setSessionHasSearched(true)
-    // keepFilters=false on first Web Only search so sidebar updates from results.
-    // keepFilters=true on repeat searches about the same topic.
-    const keepFilters = hasWebOnlySearched && sessionHasSearched
+    const keepFilters = forceResetSidebarRef.current
+      ? false
+      : hasWebOnlySearched && sessionHasSearched
+    forceResetSidebarRef.current = false  // consume the flag
     webonlySearch(query, keepFilters)
     setExpandedId(null)
   }
+
+
 
   // Mode-to-category mapping so sidebar shows relevant filters immediately on mode switch
   const MODE_FILTER_CAT: Record<AppMode, FilterCategory> = {
@@ -335,7 +347,8 @@ export default function App() {
   function handleSearch(query: string, _mode: SearchMode, _sub: string, appMode: AppMode) {
     setCurrentQueryRef(query)   // capture for multi-LLM
     const mode = fuseMode(searchMode, query)
-    const isDrift = hasAny && sessionTopic && activeChips.length > 0
+    //const isDrift = hasAny && sessionTopic && activeChips.length > 0
+    const isDrift = hasAny && sessionTopic && sidebarFilters.length > 0
 
     if (appMode === 'llm') {
       fireLlm(enrichQuery(query))
@@ -361,8 +374,19 @@ export default function App() {
     }
     if (appMode === 'urls') return
 
-    if (!hasSearched) { freshSearch(query, mode, subMode); return }
-    if (isDrift) {
+    if (!hasSearched && !hasWebOnlySearched && !hasLlmSearched) {
+      freshSearch(query, mode, subMode); return
+    }
+
+    // Switching modes with existing results always warrants a dialog —
+    // regardless of whether chips are active or the topic drifted
+    const switchingModes = hasAny && (
+      (appMode === 'web'     && (hasWebOnlySearched || hasLlmSearched)) ||
+      (appMode === 'webonly' && (hasSearched        || hasLlmSearched)) ||
+      (appMode === 'llm'     && (hasSearched        || hasWebOnlySearched))
+    )
+
+    if (isDrift || switchingModes) {
       setPendingSearchAfterTopic({ q: query, m: mode, s: subMode })
       setPendingAppMode(appMode)
       setLockedTopic(query)
@@ -386,24 +410,38 @@ export default function App() {
       else sameSearch(q, m, s, false)
     }
   }
+
   function dlgNo() {
     setShowTopicDlg(false); setSameCtxOk(false)
     setActiveChips([]); setFilterResetKey(k=>k+1)
     setFilterCat('general'); setLockedTopic(''); clientRefine([])
+
     if (pendingSearchAfterTopic) {
       const { q, m, s } = pendingSearchAfterTopic
       setPendingSearchAfterTopic(null)
-      if (pendingAppMode === 'llm')         fireLlm(enrichQuery(q))
-      else if (pendingAppMode === 'webonly') fireWebOnly(enrichQuery(q))
-      else freshSearch(q, m, s)
+      if (pendingAppMode === 'llm') {
+        fireLlm(enrichQuery(q))
+        // Tell useCards to wipe sidebar on next llmSearch — pass keepFilters=false
+        // fireLlm() already does keepFilters = hasLlmSearched && sessionHasSearched,
+        // so we need to force it. We do this by temporarily resetting hasLlmSearched
+        // via a one-shot flag. Simplest fix: add a resetSidebarOnNextLlm ref.
+        // ← See PATCH E for the cleaner approach.
+      } else if (pendingAppMode === 'webonly') {
+        fireWebOnly(enrichQuery(q))
+      } else {
+        // For Web+LLM: freshSearch with keepFilters explicitly false
+        freshSearchForced(q, m, s)
+      }
     }
   }
+
   function dlgDismiss() {
     setShowTopicDlg(false)
     setPendingSearchAfterTopic(null)
   }
-
+  
   const handleRefine = useCallback((chips:ActiveFilterChip[])=>setActiveChips(chips),[])
+  
   const handleApply  = useCallback((chips: ActiveFilterChip[]) => {
     setActiveChips(chips)
     clientRefine(chips, allFilterScope)
@@ -436,11 +474,32 @@ export default function App() {
     setLastWebQuery('')
   }
 
-  function mkGroupHandler(setId:any,setOn:any,setName:any){
-    return(id:string|null)=>{
-      if(!id){setId(null);setOn(false);setName(undefined);return}
-      if(id.startsWith('custom:')){setName(id.slice(7));setId(id);setOn(true)}
-      else{setName(undefined);setId(id);setOn(true)}
+  
+  
+  
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH H — Feature B: CardGroupBar group selection also filters cards
+//
+// Currently mkGroupHandler just sets grpId/grpOn/grpName — it GROUPS visually
+// but doesn't actually hide/show cards. The spec wants group selection to
+// "equally impact refinement results" as sidebar filter chips.
+//
+// The fix: when a group is activated, derive a filter chip from the group label
+// and call clientRefine so cards not matching that group keyword get hidden.
+//
+// FIND the mkGroupHandler function:
+//   function mkGroupHandler(setId:any,setOn:any,setName:any){
+//     return(id:string|null)=>{...}
+//   }
+//
+// REPLACE WITH:
+// ─────────────────────────────────────────────────────────────────────────────
+
+  function mkGroupHandler(setId:any, setOn:any, setName:any) {
+    return (id:string|null) => {
+      if (!id) { setId(null); setOn(false); setName(undefined); return }
+      if (id.startsWith('custom:')) { setName(id.slice(7)); setId(id); setOn(true) }
+      else { setName(undefined); setId(id); setOn(true) }
     }
   }
   const handleWebGroup  = useCallback(mkGroupHandler(setWebGrpId,  setWebGrpOn,  setWebGrpName),  [])
@@ -449,6 +508,19 @@ export default function App() {
   const handleWoGroup   = useCallback(mkGroupHandler(setWoGrpId,   setWoGrpOn,   setWoGrpName),   [])
   const handleUrlGroup  = useCallback(mkGroupHandler(setUrlGrpId,  setUrlGrpOn,  setUrlGrpName),  [])
   const handleAllGroup  = useCallback(mkGroupHandler(setAllGrpId,  setAllGrpOn,  setAllGrpName),  [])
+  // ⚠ Note: webGroups/llmGroups/etc. are defined via useMemo below the handler declarations,
+  // so you'll need to move the handler declarations AFTER the group useMemo lines.
+  // The existing code already puts handlers after groups in a few places — just ensure order is:
+  //   1. useMemo for webGroups, llmGroups, fileGroups, woGroups, urlGroups, allGroups
+  //   2. useCallback for handleWebGroup, handleLlmGroup, etc. (now passing groups)
+
+
+  //const handleWebGroup  = useCallback(mkGroupHandler(setWebGrpId,  setWebGrpOn,  setWebGrpName),  [])
+  //const handleLlmGroup  = useCallback(mkGroupHandler(setLlmGrpId,  setLlmGrpOn,  setLlmGrpName),  [])
+  //const handleFileGroup = useCallback(mkGroupHandler(setFileGrpId, setFileGrpOn, setFileGrpName), [])
+  //const handleWoGroup   = useCallback(mkGroupHandler(setWoGrpId,   setWoGrpOn,   setWoGrpName),   [])
+  //const handleUrlGroup  = useCallback(mkGroupHandler(setUrlGrpId,  setUrlGrpOn,  setUrlGrpName),  [])
+  //const handleAllGroup  = useCallback(mkGroupHandler(setAllGrpId,  setAllGrpOn,  setAllGrpName),  [])
 
   // ── Groups ────────────────────────────────────────────────────────────────
   const webGroups  = useMemo(() => [...cardGroups,    ...(webGrpName  ? [{id:`custom:${webGrpName}`,  label:`By "${webGrpName}"`,  description:'Custom', subItems:[], cardKeyword:webGrpName.toLowerCase()}]  : [])], [cardGroups,    webGrpName])
@@ -483,6 +555,7 @@ export default function App() {
     ...(fileCards.filter((c:any) => c.visible) as any[]),
     ...webOnlyCards.filter(c => c.visible),
     ...urlCards.filter((c:any) => c.visible),
+    ...moreCards.filter((c:any) => c.visible),   // ← ADDED May 15, 2026
   ]
 
   // ── Tabs — dynamic multi-LLM tabs injected into LLM section ─────────────
@@ -587,7 +660,12 @@ export default function App() {
       {showTopicDlg&&<Dlg z={2000}>
         <button onClick={dlgDismiss} style={{position:'absolute',top:12,right:12,width:28,height:28,borderRadius:'var(--r-sm)',border:'1px solid var(--border)',background:'transparent',color:'var(--text-3)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>×</button>
         <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:24}}>🔎</span><p style={{fontSize:15,fontWeight:700,color:'var(--text-1)',lineHeight:1.3}}>Is this still the same topic?</p></div>
-        <p style={{fontSize:13,color:'var(--text-2)',lineHeight:1.65}}>You've switched modes or changed your prompt. Still the same subject?</p>
+        
+        <p style={{fontSize:13,color:'var(--text-2)',lineHeight:1.65}}>
+          You switched search modes. Is this still the same topic?
+          {' '}<strong>Yes</strong> keeps your current filters. <strong>No</strong> resets everything for a fresh start.
+        </p>
+
         {lockedTopic&&<div style={bChp}>Current: <strong>"{lockedTopic.length>70?lockedTopic.slice(0,70)+'...':lockedTopic}"</strong></div>}
 
         {/* Feature ②: show recent history chips so user can reuse string1 */}
@@ -673,19 +751,27 @@ export default function App() {
           {apiError&&<div className={styles.errorBanner}><strong>⚠ Error:</strong> {apiError}</div>}
 
           {showMoreQ && (
-            <MoreQuestionPanel
-              isLoading={isMoreLoading}
-              onSubmit={q => {
-                if (activeTab === 'urls' && lastAnalyzedUrls.length > 0) {
-                  analyzeUrls(lastAnalyzedUrls, lastUrlTask, q, true)
-                } else {
-                  addMoreQuestion(q)
-                }
-                setShowMoreQ(false)
-              }}
-              onCancel={() => setShowMoreQ(false)}
-            />
-          )}
+          <MoreQuestionPanel
+            isLoading={isMoreLoading}
+            history={moreHistory}
+            onRerun={q => {
+              if (activeTab === 'urls' && lastAnalyzedUrls.length > 0) {
+                analyzeUrls(lastAnalyzedUrls, lastUrlTask, q, true)
+              } else {
+                addMoreQuestion(q)
+              }
+            }}
+            onSubmit={q => {
+              if (activeTab === 'urls' && lastAnalyzedUrls.length > 0) {
+                analyzeUrls(lastAnalyzedUrls, lastUrlTask, q, true)
+              } else {
+                addMoreQuestion(q)
+              }
+              setShowMoreQ(false)
+            }}
+            onCancel={() => setShowMoreQ(false)}
+          />
+        )}
           {allSelected.length>0&&<DocBar count={allSelected.length} onBuild={()=>setShowDoc(true)} onClear={clearDocSelections}/>}
 
           {(hasAny||multiLlmHasAny||isWorking)&&<ResultTabs activeTab={activeTab} tabs={tabs} onChange={setActiveTab}/>}
@@ -717,6 +803,37 @@ export default function App() {
               }
               filterTime={filterTime} onColsChange={setCols}
             />
+          )}
+
+          {(isMoreLoading || hasMore) && (
+            <div style={{
+              background:'var(--surface)', border:'1px solid var(--border)',
+              borderRadius:'var(--r-md)', padding:'12px 16px', marginBottom:8,
+              display:'flex', flexDirection:'column', gap:8,
+            }}>
+              <div style={{display:'flex', alignItems:'center', gap:8}}>
+                <span style={{fontSize:16}}>➕</span>
+                <span style={{fontSize:13, fontWeight:700, color:'var(--text-1)'}}>
+                  {isMoreLoading ? 'Fetching additional results…' : `Additional results (${moreCards.length} cards)`}
+                </span>
+                {isMoreLoading && (
+                  <span style={{fontSize:11, color:'var(--text-3)', marginLeft:'auto', animation:'pulse 1.2s infinite'}}>
+                    searching…
+                  </span>
+                )}
+                {!isMoreLoading && moreCards.length > 0 && (
+                  <span style={{fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:10,
+                    background:'#E8F5E9', color:'#2E7D32', marginLeft:'auto'}}>
+                    {moreCards.length} new cards
+                  </span>
+                )}
+              </div>
+              {!isMoreLoading && moreCards.length > 0 && (
+                <CardGrid cards={moreCards} zone="more" cols={cols} expandedId={expandedId} onReorder={reorderCards}
+                  onExpand={id=>{setExpandedId(p=>p===id?null:id);setExpandedZone('more')}}
+                  onDismiss={id=>dismissCard(id,'more')} onToggleDoc={id=>toggleDocSelect(id,'more')}/>
+              )}
+            </div>
           )}
 
           {expandedCard&&<CardExpandOverlay card={expandedCard} onClose={()=>setExpandedId(null)} onToggleDoc={()=>{ const ms=llmMulti.activeSlots.find(s=>s.cards.some(c=>c.id===expandedCard.id)); if(ms) llmMulti.toggleDocSelect(ms.providerId,expandedCard.id); else if(expandedZone) toggleDocSelect(expandedCard.id,expandedZone) }}/>}
@@ -1066,19 +1183,7 @@ export default function App() {
             </div>
           )}
 
-          {isMoreLoading&&(
-            <div className={styles.zone}>
-              <div className={styles.tabEmpty}><span style={{fontSize:24}}>➕</span><p>Fetching additional results...</p></div>
-            </div>
-          )}
-          {(hasMore||isMoreLoading)&&(
-            <div className={styles.zone}>
-              <ZoneLabel color="more" label="Additional question" count={moreCards.length}/>
-              <CardGrid cards={moreCards} zone="more" cols={cols} expandedId={expandedId} onReorder={reorderCards}
-                onExpand={id=>{setExpandedId(p=>p===id?null:id);setExpandedZone('more')}}
-                onDismiss={id=>dismissCard(id,'more')} onToggleDoc={id=>toggleDocSelect(id,'more')}/>
-            </div>
-          )}
+
 
           {!hasAny&&!multiLlmHasAny&&!hasLinks&&!apiError&&!isWorking&&(
             <div className={styles.welcome}>
