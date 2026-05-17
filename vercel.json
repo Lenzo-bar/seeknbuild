@@ -1,18 +1,9 @@
+
 {
   "buildCommand": "npm install --legacy-peer-deps && npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" }
-  ],
-  "functions": {
-    "api/search.js":  { "runtime": "nodejs20.x" },
-    "api/llm.js":     { "runtime": "nodejs20.x" },
-    "api/analyze.js": { "runtime": "nodejs20.x" },
-    "api/webonly.js": { "runtime": "nodejs20.x" },
-    "api/enrich.js":  { "runtime": "nodejs20.x" },
-    "api/curate.js":  { "runtime": "nodejs20.x" },
-    "api/server.js":  { "runtime": "nodejs20.x" },
-    "api/solve.js":   { "runtime": "nodejs20.x" }
-  }
+  ]
 }
